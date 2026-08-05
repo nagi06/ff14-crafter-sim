@@ -236,7 +236,7 @@
   <ul>
     <li><b>実機モード</b>にすると状態変化の抽選が止まり、毎ターン「ゲーム画面に出た状態」をタップで入力する方式になる。突貫作業の成否も入力制。<b>ゲームと同じ手を同じ順で押していけば、CP・ターン数・IQをシミュ側が自動計算してくれる</b></li>
     <li>それでもズレたら（押し間違い等）「<b>リカバリー入力</b>」ボタンで工数・品質・耐久などを実機の値に直してその地点から再開。CP・ターン・IQは計算値がプリセットされるので、合っていればそのまま再開でよい</li>
-    <li>バーの下の<b>勝算判定</b>が毎ターン更新される。「続行推奨（無風でも届く）／お祈り圏（高品質・絶好調頼み）／見切り推奨」の3段階。見切りになったら粘らず、工数だけ完成させて終了（完走なら低確率で素材が返る）</li>
+    <li>バーの下の<b>勝算判定</b>が毎ターン更新される。「続行推奨（無風でも届く）／お祈り圏（高品質頼み）／見切り推奨」の3段階。見切りになったら粘らず、工数だけ完成させて終了（完走なら低確率で素材が返る）</li>
     <li>判定はCP・耐久・IQからの概算モデル。境界線上では自分の感覚を優先してよい</li>
   </ul>
 
@@ -244,16 +244,14 @@
   <table>
     <tr><th>状態</th><th>効果</th><th>基本の対応</th></tr>
     <tr><td><span class="cond-tag" style="background:#e85d5d">高品質</span></td><td>品質1.5倍。専用技が使える</td><td><b>集中加工</b>(150%×1.5、IQ+2)が主砲。CPが底なら<b>秘訣</b>でCP+20。仕上げ域なら<b>ビエルゴ</b></td></tr>
-    <tr><td><span class="cond-tag" style="background:#ff70e0">絶好調</span></td><td>品質<b>4倍</b>！（次ターンは必ず不調）</td><td>IQが積めていれば<b>ビエルゴの祝福</b>で2万前後の一撃。まだならIQ積みを兼ねて<b>集中加工</b>。このレシピの勝ち筋そのもの</td></tr>
-    <tr><td><span class="cond-tag" style="background:#777d8c;color:#fff">不調</span></td><td>品質半減（絶好調の直後に必ず来る）</td><td>加工は撃たない。<b>経過観察</b>で流すか、バフ掛け直し・耐久回復・作業系に充てる</td></tr>
     <tr><td><span class="cond-tag" style="background:#7ec8f0">高進捗</span></td><td>作業系の進捗+50%</td><td>工数を残しているなら<b>下地作業/模範作業</b>で一気に稼ぐ</td></tr>
     <tr><td><span class="cond-tag" style="background:#8de0a8">高能率</span></td><td>CP消費が半分</td><td><b>マニピュレーション/長期倹約/パーフェクトメンド</b>など重いバフをここで撃つ</td></tr>
-    <tr><td><span class="cond-tag" style="background:#6a8ff0;color:#fff">頑強</span></td><td>耐久消費が半分</td><td>耐久10消費の技（<b>精密作業/加工系</b>）を撃つ。倹約加工より素加工が得</td></tr>
+    <tr><td><span class="cond-tag" style="background:#6a8ff0;color:#fff">頑丈</span></td><td>耐久消費が半分</td><td>耐久10消費の技（<b>精密作業/加工系</b>）を撃つ。倹約加工より素加工が得</td></tr>
     <tr><td><span class="cond-tag" style="background:#f0e06a">安定</span></td><td>成功率+25%</td><td>突貫作業を使う構成なら価値大。本構成では通常運用でOK</td></tr>
     <tr><td><span class="cond-tag" style="background:#c98fe8">長持続</span></td><td>このターンに使ったバフ+2ターン</td><td><b>マニピュレーション/イノベーション/ヴェネレーション</b>をここで撃つ</td></tr>
     <tr><td>通常</td><td>-</td><td>倹約加工でIQ積み、または計画通りの手</td></tr>
   </table>
-  <p class="note">※「良兆候」（次ターン高品質の予告）はこのレシピでは出ない。高品質・絶好調は不意に来るので、来たときに何を撃つか常に決めておくのがコツ。</p>
+  <p class="note">※「良兆候」（次ターン高品質の予告）はこのレシピでは出ない。高品質は不意に来るので、来たときに何を撃つか常に決めておくのがコツ。</p>
 
   <h2>全体の流れ（3フェーズ）</h2>
   <h2 style="font-size:0.85rem; border:none; padding-left:0;">① 工数フェーズ（ターン1〜7目安）</h2>
@@ -265,18 +263,18 @@
   </ul>
   <h2 style="font-size:0.85rem; border:none; padding-left:0;">② 品質フェーズ（IQ10まで積む）</h2>
   <ul>
-    <li>基本は<b>倹約加工</b>（耐久5でIQ+1）。頑強が来たら素の加工系、高品質が来たら<b>集中加工</b>(IQ+2)か<b>秘訣</b></li>
+    <li>基本は<b>倹約加工</b>（耐久5でIQ+1）。頑丈が来たら素の加工系、高品質が来たら<b>集中加工</b>(IQ+2)か<b>秘訣</b></li>
     <li>耐久管理は<b>マニピュレーション</b>優先。高能率のターンで撃てると理想（96→48CP）</li>
     <li>高品質を1回も引けない時の保険に<b>一心不乱</b>（1回だけ集中加工/秘訣を条件無視で使える）</li>
     <li>IQ10になったら<b>匠の神業</b>（耐久0で品質上げ）とイノベーションを絡めて品質を伸ばす</li>
-    <li>頑強のときは<b>下地加工</b>（200%・IQ+2）が耐久10で撃てて最効率。倹約中・頑強時のIQ積みは<b>加工→洗練加工</b>コンボ（洗練はIQ+2）</li>
+    <li>頑丈のときは<b>下地加工</b>（200%・IQ+2）が耐久10で撃てて最効率。倹約中・頑丈時のIQ積みは<b>加工→洗練加工</b>コンボ（洗練はIQ+2）</li>
     <li>CPが尽きたら<b>ヘイスティタッチ</b>（CP0・成功率60%）がタダで振れるサイコロ。成功直後は<b>デアリングタッチ</b>（CP0・150%・60%）に繋がるので必ず使う</li>
     <li>工数フェーズで耐久が細いときは<b>倹約作業</b>（耐久5・180%）。※<b>匠の早業</b>は高難度レシピでは使用不可（ボタンも常に無効）</li>
   </ul>
   <h2 style="font-size:0.85rem; border:none; padding-left:0;">③ 仕上げ「グレスト祈り」（IQ10からが本番）</h2>
   <ul>
-    <li>素のビエルゴだけでは31500に届かないことが多い。<b>イノベ＋グレストを維持したまま経過観察や設計変更で流し、高品質(1.5倍)か絶好調(4倍)が来た瞬間にビエルゴ</b>を叩き込むのが勝ち筋</li>
-    <li>絶好調ビエルゴ（IQ10・GS・イノベ込み）は一撃約2万。これを引けるかが勝負の分かれ目</li>
+    <li>素のビエルゴだけでは31500に届かないことが多い。<b>イノベ＋グレストを維持したまま経過観察や設計変更で流し、高品質(1.5倍)が来た瞬間にビエルゴ</b>を叩き込むのが勝ち筋</li>
+    <li>高品質ビエルゴ（IQ10・GS・イノベ込み）は一撃約7,500。終盤にこれを1〜2回引けるかが勝負の分かれ目</li>
     <li>残り品質と「ビエルゴ見込」チップを見比べて、届くならためらわず撃つ</li>
     <li>品質31500を超えたら<b>模範作業</b>で完成。耐久が足りない時は匠の絶技（消費0）を仕上げに残しておくと安全</li>
   </ul>
@@ -293,7 +291,8 @@
   <ul class="note">
     <li>レシピ: rlvl776 / 除数180・180 / 補正100%（XIVAPI実データ。効率はLv100通常レシピと同じ）</li>
     <li>作業精度5657 → 100%効率あたり進捗316、加工精度5417 → 品質335（設定タブで変更可、食事薬のCPも反映）</li>
-    <li>状態変化の出現率は<b>推定値</b>（高品質12% / 絶好調4% / 高進捗10% / 高能率12% / 頑強15% / 安定10% / 長持続10% / 通常27%、絶好調の翌ターンは必ず不調）。実測と多少ズレる可能性あり。実際にプレイして「高品質がもっと出る」等が分かったら、このファイル内の CONDITIONS の数値を直せば精度が上がる</li>
+    <li>出る状態は【通常・高品質・高進捗・高能率・頑丈・安定・長持続】の7種のみ。<b>最高品質・不調・良兆候は高難度レシピでは出ない</b>（検証者のリストと仕様解説で確認済み）</li>
+    <li>状態変化の出現率は<b>推定値</b>（高品質14% / 高進捗10% / 高能率14% / 頑丈15% / 安定10% / 長持続12% / 通常25%）。実測と多少ズレる可能性あり。実際にプレイして「高品質がもっと出る」等が分かったら、このファイル内の CONDITIONS の数値を直せば精度が上がる</li>
     <li>「おすすめ」はあくまで<b>判断の目安</b>。機械的におすすめだけを追った自動テストでは完走成功率は数%だった（惜敗2.9万台が多数）。状態の引きに合わせた人間の判断——特にビエルゴを撃つ/待つの見極め——で上積みするのが本番</li>
   </ul>
 </div>
@@ -326,17 +325,15 @@ const RECIPE = {
 
 /* ========= 状態変化定義（出現率は既存エキスパートからの推定） ========= */
 const CONDITIONS = {
-  normal:    {name:"通常",   color:"#c8ccd8", p:0.27, desc:"特別な効果はない"},
-  good:      {name:"高品質", color:"#e85d5d", p:0.12, desc:"品質1.5倍 ／ 秘訣・集中加工・集中作業が使える"},
-  excellent: {name:"絶好調", color:"#ff70e0", p:0.04, desc:"品質4倍！ ビエルゴの最大チャンス（次ターンは必ず不調）"},
-  poor:      {name:"不調",   color:"#777d8c", p:0,    desc:"品質半減。加工は撃たずバフ・回復・作業系で流す"},
+  normal:    {name:"通常",   color:"#c8ccd8", p:0.25, desc:"特別な効果はない"},
+  good:      {name:"高品質", color:"#e85d5d", p:0.14, desc:"品質1.5倍 ／ 秘訣・集中加工・集中作業が使える"},
   malleable: {name:"高進捗", color:"#7ec8f0", p:0.10, desc:"進捗1.5倍 ／ 作業系を撃つチャンス"},
-  pliant:    {name:"高能率", color:"#8de0a8", p:0.12, desc:"CP消費が半分 ／ 重いバフを撃つチャンス"},
-  sturdy:    {name:"頑強",   color:"#6a8ff0", p:0.15, desc:"耐久消費が半分 ／ 耐久10の技を撃つチャンス"},
+  pliant:    {name:"高能率", color:"#8de0a8", p:0.14, desc:"CP消費が半分 ／ 重いバフを撃つチャンス"},
+  sturdy:    {name:"頑丈",   color:"#6a8ff0", p:0.15, desc:"耐久消費が半分 ／ 耐久10の技を撃つチャンス"},
   centered:  {name:"安定",   color:"#f0e06a", p:0.10, desc:"成功率+25%（突貫作業などに影響）"},
-  primed:    {name:"長持続", color:"#c98fe8", p:0.10, desc:"このターンに使ったバフの持続+2"},
+  primed:    {name:"長持続", color:"#c98fe8", p:0.12, desc:"このターンに使ったバフの持続+2"},
 };
-function isGoodish(c){ return c==="good"||c==="excellent"; }
+function isGoodish(c){ return c==="good"; }
 
 /* ========= プレイヤー設定 ========= */
 let player = { craft:5657, control:5417, cp:649, foodCp:86, potCp:21, useFood:true, meister:true };
@@ -453,9 +450,6 @@ function rollCondition(){
   for(const [k,c] of Object.entries(CONDITIONS)){ acc+=c.p; if(r<acc) return k; }
   return "normal";
 }
-function nextCondition(cur){
-  return cur==="excellent" ? "poor" : rollCondition(); // 絶好調の直後は必ず不調
-}
 
 /* ========= 使用可否 ========= */
 function canUse(a){
@@ -510,7 +504,7 @@ function qualGain(a, effOverride){
   let mult = 1;
   if(st.buffs.innovation>0) mult += 0.5;
   if(st.buffs.greatStrides>0) mult += 1.0;
-  let cond = st.condition==="good" ? 1.5 : st.condition==="excellent" ? 4 : st.condition==="poor" ? 0.5 : 1;
+  let cond = st.condition==="good" ? 1.5 : 1;
   return Math.floor(Math.floor(baseQual()*iqMult + EPS) * eff * cond * mult + EPS);
 }
 function byregotEstimate(){
@@ -676,8 +670,7 @@ function endStep(a){
   }
   st.lastAction = a.id;
   st.step++;
-  if(st.condition==="excellent"){ st.condition = "poor"; } // 絶好調の直後は必ず不調
-  else if(followMode){ st.awaitCond = true; }
+  if(followMode){ st.awaitCond = true; }
   else { st.condition = rollCondition(); }
 }
 function resolveRapid(ok){
@@ -746,22 +739,6 @@ function recommendCore(){
   if(remQ>0 && st.iq>=1 && st.cp>=cpCost(A.byregot) && byregotNow() >= remQ && st.durability>durCost(A.byregot))
     return r("byregot","今のビエルゴ("+byregotNow().toLocaleString()+")で品質31500に届く！ためらわず撃つ");
 
-  // 絶好調: 何をおいても品質4倍を取りに行く
-  if(cond==="excellent"){
-    if(st.iq>=8 && st.cp>=cpCost(A.byregot) && st.durability>10)
-      return r("byregot","絶好調は品質4倍！IQ"+st.iq+"のビエルゴで最大の一撃（次は必ず不調なので今撃つ）");
-    if(st.cp>=cpCost(A.preciseTouch) && st.durability>5)
-      return r("preciseTouch","絶好調は品質4倍。集中加工で大打点＋IQ+2（ビエルゴはIQを積んでから）");
-    return r("tricks","CPが底。せめて秘訣で回収");
-  }
-  // 不調: 品質半減。加工は撃たず流す
-  if(cond==="poor" && remQ>0){
-    if(!progDone && remP > progGain(A.carefulSynth)+100 && st.cp>=cpCost(A.carefulSynth))
-      return r("carefulSynth","不調は品質半減だが進捗には無関係。作業系で流す");
-    if(st.buffs.manipulation<=0 && st.durability<=40 && st.cp>=96+60) return r("manipulation","不調のうちに耐久を立て直す");
-    if(st.buffs.innovation<=0 && st.iq>=4 && st.cp>=18+60) return r("innovation","不調のうちにイノベーションを掛け直す");
-    if(st.cp>=cpCost(A.observe)) return r("observe","不調は経過観察(7CP)で流す。品質を撃つのはもったいない");
-  }
 
   // 品質達成済み → 完成させる
   if(remQ<=0){
@@ -825,8 +802,8 @@ function recommendCore(){
     if(!st.qiUsed && st.buffs.innovation<=0) return r("quickInnovation","CP残がビエルゴ1回分。クイックイノベーション(0CP)を乗せてから撃つ");
     // 素で届かないが高品質(1.5倍)なら届く → 残CPの許す限り祈る
     if(remQ > byregotNow() && remQ <= Math.floor(byregotEstimate()*1.5)){
-      if(cond==="normal" && st.coLeft>0) return r("carefulObservation","素のビエルゴでは届かない。設計変更で高品質/絶好調を釣って1.5〜4倍ビエルゴ");
-      if(st.cp >= cpCost(A.observe)+24) return r("observe","素のビエルゴでは届かない。経過観察で流して高品質/絶好調ビエルゴを祈る（残CP分だけ粘れる）");
+      if(cond==="normal" && st.coLeft>0) return r("carefulObservation","素のビエルゴでは届かない。設計変更で高品質を釣って1.5倍ビエルゴ");
+      if(st.cp >= cpCost(A.observe)+24) return r("observe","素のビエルゴでは届かない。経過観察で流して高品質ビエルゴを祈る（残CP分だけ粘れる）");
     }
     return r("byregot","CPが尽きる前にビエルゴで出し切って手仕舞い。ここで届かなければその製作は負け筋");
   }
@@ -846,11 +823,11 @@ function recommendCore(){
     if(st.cp>=112+30) return r("immaculateMend","パーフェクトメンドで耐久全回復");
     if(st.cp>=88+30) return r("mastersMend","マスターズメンドで耐久回復");
   }
-  // 頑強: 耐久10の技が半額
+  // 頑丈: 耐久10の技が半額
   if(cond==="sturdy" && st.iq<10 && st.buffs.wasteNot<=0 && st.durability>5){
     if(st.iq<=8 && st.cp>=cpCost(A.preparatoryTouch) && st.durability>durCost(A.preparatoryTouch))
-      return r("preparatoryTouch","頑強なら下地加工が耐久10で効率200%＋IQ+2。一番おいしい使い方");
-    return r(st.lastAction==="basicTouch"?"refinedTouch":"basicTouch","頑強は耐久10の技が5で済む。加工→洗練加工コンボでIQを積む(洗練はIQ+2)");
+      return r("preparatoryTouch","頑丈なら下地加工が耐久10で効率200%＋IQ+2。一番おいしい使い方");
+    return r(st.lastAction==="basicTouch"?"refinedTouch":"basicTouch","頑丈は耐久10の技が5で済む。加工→洗練加工コンボでIQを積む(洗練はIQ+2)");
   }
   // 長持続: バフを伸ばす
   if(cond==="primed"){
@@ -869,13 +846,13 @@ function recommendCore(){
   } else {
     // IQ10: イノベを維持して絶技/集中で品質を伸ばし、最後は必ずビエルゴ
     if(st.buffs.innovation<=0 && st.cp>=18+32+24) return r("innovation","IQ10。イノベーションを掛けて品質を伸ばす");
-    // グレスト祈り: 素のビエルゴでは届かないがGS+高品質/絶好調なら届く域
+    // グレスト祈り: 素のビエルゴでは届かないがGS+高品質なら届く域
     if(st.buffs.greatStrides>0 && remQ > by && st.buffs.innovation>0){
-      if(cond==="normal" && st.coLeft>0) return r("carefulObservation","GSを維持したまま設計変更で高品質/絶好調を釣る");
-      if(st.cp>=cpCost(A.observe)) return r("observe","GS＋イノベを維持して経過観察で流し、高品質/絶好調ビエルゴを待つ（お祈りタイム）");
+      if(cond==="normal" && st.coLeft>0) return r("carefulObservation","GSを維持したまま設計変更で高品質を釣る");
+      if(st.cp>=cpCost(A.observe)) return r("observe","GS＋イノベを維持して経過観察で流し、高品質ビエルゴを待つ（お祈りタイム）");
     }
     if(st.buffs.greatStrides<=0 && st.buffs.innovation>0 && remQ > by && remQ <= by*4 && st.cp>=32+24+21)
-      return r("greatStrides","素のビエルゴでは届かない。グレストを張って高品質(1.5倍)/絶好調(4倍)ビエルゴを祈る");
+      return r("greatStrides","素のビエルゴでは届かない。グレストを張って高品質(1.5倍)ビエルゴを祈る");
     if(cond==="normal" && st.coLeft>0 && remQ > by*1.2 && st.buffs.innovation>0) return r("carefulObservation","設計変更で高品質を釣る（IQ10×イノベの集中加工は一撃2200超）");
     if(!st.hsUsed && remQ > by*1.2 && st.buffs.innovation>0 && st.cp>=cpCost(A.preciseTouch)+24) return r("heartAndSoul","一心不乱で集中加工を解禁（イノベ込みで一撃1500超）");
     if(st.hsActive && st.cp>=cpCost(A.preciseTouch)) return r("preciseTouch","一心不乱が有効。集中加工で大きく品質を積む");
@@ -916,14 +893,14 @@ function assess(){
   const finesseN = Math.max(0, Math.floor(cp/36.5));
   q += finesseN * Math.floor(Math.floor(bq*2+EPS)*1.5+EPS);
   q += Math.floor(Math.floor(bq*2+EPS)*3*2.5+EPS); // GS+イノベのビエルゴ
-  // 上振れ期待: 高品質(集中加工/1.5倍ビエルゴ)と絶好調(4倍ビエルゴ)
+  // 上振れ期待: 高品質(集中加工/1.5倍ビエルゴ)
   const turns = nProg + need + finesseN + 3;
-  const upside = q + Math.round(turns*0.16*1200) + Math.round(turns*0.04*7000);
+  const upside = q + Math.round(turns*0.14*1300); // 高品質(約14%)による集中加工/1.5倍ビエルゴの上積み期待
 
   const nums = `無風見込み${q.toLocaleString()} / 上振れ込み${upside.toLocaleString()} / 残り品質${remQ.toLocaleString()}`;
   if(durShort && cp<=96) return {lv:"bad", head:"見切り推奨", text:`耐久もCPも足りない（${nums}）。工数だけ完成させて終了を（完走なら低確率で素材が返る）`};
   if(q >= remQ)     return {lv:"ok",   head:"続行推奨", text:`高品質を引けなくても届く計算（${nums}）`};
-  if(upside >= remQ) return {lv:"pray", head:"続行（お祈り圏）", text:`高品質/絶好調を引ければ届く（${nums}）。グレスト＋イノベを維持して祈る`};
+  if(upside >= remQ) return {lv:"pray", head:"続行（お祈り圏）", text:`高品質を引ければ届く（${nums}）。グレスト＋イノベを維持して祈る`};
   return {lv:"bad", head:"見切り推奨", text:`上振れ込みでも届かない公算大（${nums}）。工数だけ完成させて終了を（完走なら低確率で素材が返る）`};
 }
 
@@ -1039,7 +1016,7 @@ function render(){
   if(st.awaitCond && !st.finished && !st.failed){
     pickBox.style.display = "";
     document.getElementById("condPickGrid").innerHTML =
-      Object.entries(CONDITIONS).filter(([k])=>k!=="poor").map(([k,cc])=>
+      Object.entries(CONDITIONS).map(([k,cc])=>
         `<button style="border-color:${cc.color}; color:${cc.color};" onclick="pickCondition('${k}')">${cc.name}</button>`).join("");
   } else { pickBox.style.display = "none"; }
 
