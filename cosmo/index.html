@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ルインド・アクアダクト中間素材 製作シミュレーター（コスモツール版）</title>
+<style>
+  :root{
+    --bg:#12141a; --panel:#1c1f28; --panel2:#252936; --line:#343a4d;
+    --text:#e8eaf0; --sub:#9aa3b8; --accent:#e8b34b; --accent2:#4bb3e8;
+    --good:#e85d5d; --ok:#5dc78a; --warn:#e8a24b;
+    --prog:#4bb3e8; --qual:#c98fe8; --dur:#5dc78a; --cp:#e8b34b;
+  }
+  *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
+  html{font-size:15px;}
+  body{background:var(--bg); color:var(--text); font-family:"Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo",sans-serif; padding-bottom:90px;}
+  header{position:sticky; top:0; z-index:10; background:var(--panel); border-bottom:1px solid var(--line); padding:8px 12px;}
+  header h1{font-size:0.95rem; color:var(--accent); font-weight:600;}
+  header .sub{font-size:0.7rem; color:var(--sub);}
+  .tabs{display:flex; gap:6px; margin-top:8px;}
+  .tabs button{flex:1; padding:8px 0; border:1px solid var(--line); background:var(--panel2); color:var(--sub); border-radius:8px; font-size:0.85rem;}
+  .tabs button.active{background:var(--accent); color:#1a1408; border-color:var(--accent); font-weight:700;}
+  main{padding:10px 12px; max-width:520px; margin:0 auto;}
+  .page{display:none;} .page.active{display:block;}
+
+  /* モード切替・勝算・リカバリー */
+  .mode-tabs{display:flex; gap:6px; margin-bottom:10px;}
+  .mode-tabs button{flex:1; padding:8px 0; border:1px solid var(--line); background:var(--panel2); color:var(--sub); border-radius:8px; font-size:0.8rem;}
+  .mode-tabs button.on{background:var(--accent2); color:#08131a; border-color:var(--accent2); font-weight:700;}
+  .verdict{border-radius:10px; padding:7px 10px; margin-top:8px; font-size:0.75rem; line-height:1.5; border:1px solid;}
+  .verdict b{font-size:0.82rem;}
+  .verdict.ok{border-color:var(--ok); color:var(--ok); background:#12241a;}
+  .verdict.pray{border-color:var(--warn); color:var(--warn); background:#2a2010;}
+  .verdict.bad{border-color:var(--good); color:var(--good); background:#2a1414;}
+  .pick-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-bottom:10px;}
+  .pick-grid button{border-radius:10px; padding:10px 4px; font-size:0.82rem; font-weight:700; border:2px solid; background:var(--panel2);}
+  .rec-grid{display:grid; grid-template-columns:1fr 1fr; gap:6px 10px;}
+  .rec-grid label{font-size:0.68rem; color:var(--sub); display:block;}
+  .rec-grid input, .rec-grid select{width:100%; padding:6px; border-radius:8px; border:1px solid var(--line); background:#0d0f14; color:var(--text); font-size:0.85rem;}
+  .rapid-ask{display:flex; gap:8px; margin-top:6px;}
+  .rapid-ask button{flex:1; padding:10px 0; border-radius:10px; font-weight:700; font-size:0.9rem;}
+
+  /* ステータスバー */
+  .bars{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px 12px; margin-bottom:10px;}
+  .bar-row{margin-bottom:8px;}
+  .bar-row:last-child{margin-bottom:0;}
+  .bar-label{display:flex; justify-content:space-between; font-size:0.75rem; color:var(--sub); margin-bottom:3px;}
+  .bar-label b{color:var(--text); font-variant-numeric:tabular-nums;}
+  .bar{height:10px; background:#0d0f14; border-radius:5px; overflow:hidden; position:relative;}
+  .bar > i{display:block; height:100%; border-radius:5px; transition:width .25s;}
+  .bar .req-line{position:absolute; top:-2px; bottom:-2px; width:2px; background:#fff8; }
+  .mini-row{display:flex; gap:8px; margin-top:8px;}
+  .chip{flex:1; background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:5px 8px; text-align:center;}
+  .chip .k{font-size:0.62rem; color:var(--sub); display:block;}
+  .chip .v{font-size:0.95rem; font-weight:700; font-variant-numeric:tabular-nums;}
+
+  /* 状態変化 */
+  .cond-card{border-radius:12px; padding:12px; margin-bottom:10px; border:2px solid var(--line); background:var(--panel); display:flex; align-items:center; gap:12px;}
+  .cond-orb{width:44px; height:44px; border-radius:50%; flex-shrink:0; box-shadow:0 0 14px 2px var(--orb, #888); background:radial-gradient(circle at 35% 30%, #ffffffcc, var(--orb,#888) 60%);}
+  .cond-info{flex:1;}
+  .cond-name{font-size:1.05rem; font-weight:700;}
+  .cond-desc{font-size:0.72rem; color:var(--sub); margin-top:2px;}
+  .step-num{font-size:0.72rem; color:var(--sub); text-align:right;}
+  .step-num b{color:var(--text); font-size:1rem;}
+
+  /* おすすめ */
+  .reco{background:linear-gradient(135deg,#2a2410,#1c1f28); border:1px solid var(--accent); border-radius:12px; padding:10px 12px; margin-bottom:10px;}
+  .reco .t{font-size:0.68rem; color:var(--accent); font-weight:700; letter-spacing:.05em;}
+  .reco .a{font-size:1rem; font-weight:700; margin:2px 0;}
+  .reco .r{font-size:0.75rem; color:var(--sub); line-height:1.5;}
+
+  /* アクション */
+  .agroup{margin-bottom:10px;}
+  .agroup h3{font-size:0.72rem; color:var(--sub); margin:8px 2px 5px; font-weight:600;}
+  .agrid{display:grid; grid-template-columns:repeat(3,1fr); gap:6px;}
+  .abtn{position:relative; border:1px solid var(--line); background:var(--panel2); color:var(--text); border-radius:10px; padding:8px 4px 6px; font-size:0.78rem; line-height:1.25; min-height:52px;}
+  .abtn small{display:block; font-size:0.6rem; color:var(--sub); margin-top:2px; font-variant-numeric:tabular-nums;}
+  .abtn:disabled{opacity:0.32;}
+  .abtn.reco-glow{border-color:var(--accent); box-shadow:0 0 8px 1px #e8b34b66; background:#2a2410;}
+  .abtn.buff-on{border-color:var(--accent2);}
+  .abtn .cnt{position:absolute; top:3px; right:6px; font-size:0.6rem; color:var(--accent);}
+
+  /* 履歴・結果 */
+  .toolbar{display:flex; gap:8px; margin:10px 0;}
+  .toolbar button{flex:1; padding:10px 0; border-radius:10px; border:1px solid var(--line); background:var(--panel2); color:var(--text); font-size:0.85rem;}
+  .toolbar button.danger{color:var(--good); border-color:#5a3030;}
+  .result{border-radius:12px; padding:14px; margin-bottom:10px; text-align:center; font-weight:700; font-size:1.05rem; display:none;}
+  .result.show{display:block;}
+  .result.success{background:#15301f; border:1px solid var(--ok); color:var(--ok);}
+  .result.fail{background:#301515; border:1px solid var(--good); color:var(--good);}
+  .result .detail{font-size:0.75rem; font-weight:400; color:var(--sub); margin-top:6px; line-height:1.6;}
+  .history{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:8px 12px; max-height:180px; overflow-y:auto; font-size:0.72rem; line-height:1.7; color:var(--sub);}
+  .history .h-act{color:var(--text);}
+  .history .h-cond{font-weight:700;}
+
+  /* ガイド */
+  .guide h2{font-size:0.95rem; color:var(--accent); margin:16px 0 8px; border-left:3px solid var(--accent); padding-left:8px;}
+  .guide p, .guide li{font-size:0.82rem; line-height:1.75; color:var(--text);}
+  .guide ul{padding-left:1.2em; margin:6px 0;}
+  .guide .note{font-size:0.72rem; color:var(--sub);}
+  table{width:100%; border-collapse:collapse; font-size:0.75rem; margin:8px 0;}
+  th,td{border:1px solid var(--line); padding:6px 6px; text-align:left; line-height:1.5;}
+  th{background:var(--panel2); color:var(--sub); font-weight:600; white-space:nowrap;}
+  td b{color:var(--accent);}
+  .cond-tag{display:inline-block; padding:1px 7px; border-radius:99px; font-size:0.7rem; font-weight:700; color:#111;}
+
+  /* 設定 */
+  .set-row{display:flex; align-items:center; justify-content:space-between; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:8px;}
+  .set-row label{font-size:0.82rem;}
+  .set-row .hint{display:block; font-size:0.65rem; color:var(--sub);}
+  .set-row input[type=number]{width:84px; padding:7px; border-radius:8px; border:1px solid var(--line); background:#0d0f14; color:var(--text); font-size:0.9rem; text-align:right;}
+  .set-row input[type=checkbox]{width:20px; height:20px;}
+  .apply-note{font-size:0.72rem; color:var(--warn); margin:8px 2px;}
+</style>
+</head>
+<body>
+<header>
+  <h1>ルインド・アクアダクト中間素材 製作シミュレーター（コスモツール版）</h1>
+  <div class="sub">部材/金属材/錬金樹脂 共通レシピ(rlvl776) 工数11250 / 品質31520 / 耐久60 ｜ 完成ライン品質31500</div>
+  <div class="tabs">
+    <button id="tab-sim" class="active" onclick="showPage('sim')">製作</button>
+    <button id="tab-guide" onclick="showPage('guide')">手順ガイド</button>
+    <button id="tab-set" onclick="showPage('set')">設定</button>
+  </div>
+</header>
+
+<main>
+<!-- ============ 製作ページ ============ -->
+<div id="page-sim" class="page active">
+  <div class="mode-tabs">
+    <button id="mode-practice" class="on" onclick="setMode(false)">練習モード（状態は自動抽選）</button>
+    <button id="mode-follow" onclick="setMode(true)">実機モード（状態を入力）</button>
+  </div>
+  <div id="resultBox" class="result"></div>
+
+  <div class="bars">
+    <div class="bar-row">
+      <div class="bar-label"><span>工数</span><b><span id="v-prog">0</span> / 11250</b></div>
+      <div class="bar"><i id="b-prog" style="background:var(--prog);width:0%"></i></div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label"><span>品質</span><b><span id="v-qual">0</span> / 31520</b></div>
+      <div class="bar"><i id="b-qual" style="background:var(--qual);width:0%"></i><span class="req-line" style="left:99.9%"></span></div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label"><span>耐久</span><b><span id="v-dur">60</span> / 60</b></div>
+      <div class="bar"><i id="b-dur" style="background:var(--dur);width:100%"></i></div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label"><span>CP</span><b><span id="v-cp">0</span> / <span id="v-cpmax">0</span></b></div>
+      <div class="bar"><i id="b-cp" style="background:var(--cp);width:100%"></i></div>
+    </div>
+    <div class="mini-row">
+      <div class="chip"><span class="k">IQ</span><span class="v" id="v-iq">0</span></div>
+      <div class="chip"><span class="k">ビエルゴ見込</span><span class="v" id="v-byregot">-</span></div>
+      <div class="chip"><span class="k">残り工数</span><span class="v" id="v-remprog">11250</span></div>
+      <div class="chip"><span class="k">残り品質</span><span class="v" id="v-remqual">31500</span></div>
+    </div>
+    <div class="mini-row" id="buffRow" style="flex-wrap:wrap;"></div>
+    <div id="verdictLine"></div>
+  </div>
+
+  <div id="condPickBox" style="display:none;">
+    <div style="font-size:0.78rem; color:var(--accent2); font-weight:700; margin:2px 2px 6px;">ゲーム画面に出ている状態変化を選んでください</div>
+    <div class="pick-grid" id="condPickGrid"></div>
+  </div>
+
+  <div class="cond-card" id="condCard">
+    <div class="cond-orb" id="condOrb"></div>
+    <div class="cond-info">
+      <div class="cond-name" id="condName">通常</div>
+      <div class="cond-desc" id="condDesc">特別な効果はない</div>
+    </div>
+    <div class="step-num">ターン<br><b id="stepNum">1</b></div>
+  </div>
+
+  <div class="reco" id="recoCard">
+    <div class="t">おすすめ</div>
+    <div class="a" id="recoAction">-</div>
+    <div class="r" id="recoReason">-</div>
+  </div>
+
+  <div id="actionArea"></div>
+
+  <div class="toolbar">
+    <button onclick="undo()" id="undoBtn">← 1手戻す</button>
+    <button onclick="toggleRecovery()" style="border-color:var(--accent2); color:var(--accent2);">リカバリー入力</button>
+    <button onclick="resetCraft()" class="danger">最初から</button>
+  </div>
+
+  <div id="recPanel" style="display:none; background:var(--panel); border:1px solid var(--accent2); border-radius:12px; padding:10px 12px; margin:0 0 10px;">
+    <div style="font-size:0.8rem; color:var(--accent2); font-weight:700; margin-bottom:8px;">リカバリー入力 — ゲーム画面の実際の値に合わせて再開</div>
+    <div class="rec-grid">
+      <div><label>工数（進捗）</label><input type="number" id="rec-prog"></div>
+      <div><label>品質</label><input type="number" id="rec-qual"></div>
+      <div><label>耐久</label><input type="number" id="rec-dur"></div>
+      <div><label>CP</label><input type="number" id="rec-cp"></div>
+      <div><label>IQスタック (0-10)</label><input type="number" id="rec-iq" min="0" max="10"></div>
+      <div><label>ターン数</label><input type="number" id="rec-step"></div>
+      <div><label>今の状態変化</label><select id="rec-cond"></select></div>
+      <div><label>設計変更 残り回数</label><input type="number" id="rec-co" min="0" max="3"></div>
+      <div><label>ヴェネレーション残りT</label><input type="number" id="rec-ven" min="0"></div>
+      <div><label>イノベーション残りT</label><input type="number" id="rec-innov" min="0"></div>
+      <div><label>グレートストライド残りT</label><input type="number" id="rec-gs" min="0"></div>
+      <div><label>倹約残りT</label><input type="number" id="rec-wn" min="0"></div>
+      <div><label>マニピュレーション残りT</label><input type="number" id="rec-manip" min="0"></div>
+      <div><label>確信残りT</label><input type="number" id="rec-mume" min="0"></div>
+      <div style="grid-column:1/3; display:flex; gap:14px; padding-top:2px;">
+        <label style="display:flex; align-items:center; gap:5px; font-size:0.72rem;"><input type="checkbox" id="rec-hs" style="width:16px;height:16px;">一心不乱 使用済み</label>
+        <label style="display:flex; align-items:center; gap:5px; font-size:0.72rem;"><input type="checkbox" id="rec-qi" style="width:16px;height:16px;">クイックイノベ 使用済み</label>
+        <label style="display:flex; align-items:center; gap:5px; font-size:0.72rem;"><input type="checkbox" id="rec-tp" style="width:16px;height:16px;">匠の絶技 使用済み</label>
+      </div>
+    </div>
+    <div style="display:flex; gap:8px; margin-top:10px;">
+      <button onclick="applyRecovery()" style="flex:2; padding:10px 0; border-radius:10px; border:1px solid var(--accent2); background:var(--accent2); color:#08131a; font-weight:700;">この状態から再開（勝算も判定）</button>
+      <button onclick="toggleRecovery()" style="flex:1; padding:10px 0; border-radius:10px; border:1px solid var(--line); background:var(--panel2); color:var(--sub);">閉じる</button>
+    </div>
+  </div>
+
+  <div class="history" id="historyBox">ここに履歴が表示されます</div>
+</div>
+
+<!-- ============ ガイドページ ============ -->
+<div id="page-guide" class="page guide">
+  <h2>このレシピの前提</h2>
+  <p>対象はパッチ7.55の庭具「ルインド・アクアダクト」の<b>中間素材3種（部材/金属材/錬金樹脂）</b>。3種ともレシピ数値は同一の高難度（エキスパート）レシピで、<b>マイスター必須</b>・レベル100・お手伝い製作/簡易製作不可。状態変化がランダムに出るためマクロは組めず、手打ちで状態に合わせて判断する。各2個、計6回の高難度製作を完走する必要がある。</p>
+  <p class="note">本体の組み立て（彫金、中間素材×各2＋カットストーン×7＋ヤクテル淡水×7）は工数10040・HQなし・品質要求なしの通常レシピ。素材さえ揃えばリスクはない。勝負はこの中間素材だけ。</p>
+  <ul>
+    <li>必要作業精度 <b>5620</b>（コスモツール最終＋新式防具 5779 なら余裕をもって通過）</li>
+    <li>初期品質0%。品質<b>31500</b>以上で完成させないと素材ロスト（製作失敗扱い）</li>
+    <li>新式フル禁断＋食事薬での成功率は体感4〜5割。<b>失敗前提で素材は多めに用意する</b></li>
+    <li><b>クラフターの設計図を忘れずに持ち込む。</b>設計変更・一心不乱・クイックイノベーションは1回使うごとに1枚消費（フル活用で最大5枚/製作、6個作るなら30枚）。スクリップ交換で事前補充</li>
+  </ul>
+
+  <h2>実機モードとリカバリー（本番での使い方）</h2>
+  <ul>
+    <li><b>実機モード</b>にすると状態変化の抽選が止まり、毎ターン「ゲーム画面に出た状態」をタップで入力する方式になる。突貫作業の成否も入力制。<b>ゲームと同じ手を同じ順で押していけば、CP・ターン数・IQをシミュ側が自動計算してくれる</b></li>
+    <li>それでもズレたら（押し間違い等）「<b>リカバリー入力</b>」ボタンで工数・品質・耐久などを実機の値に直してその地点から再開。CP・ターン・IQは計算値がプリセットされるので、合っていればそのまま再開でよい</li>
+    <li>バーの下の<b>勝算判定</b>が毎ターン更新される。「続行推奨（無風でも届く）／お祈り圏（高品質頼み）／見切り推奨」の3段階。見切りになったら粘らず、工数だけ完成させて終了（完走なら低確率で素材が返る）</li>
+    <li>判定はCP・耐久・IQからの概算モデル。境界線上では自分の感覚を優先してよい</li>
+  </ul>
+
+  <h2>状態変化の効果と対応</h2>
+  <table>
+    <tr><th>状態</th><th>効果</th><th>基本の対応</th></tr>
+    <tr><td><span class="cond-tag" style="background:#e85d5d">高品質</span></td><td>品質<b>1.75倍</b>（コスモツール効果）。専用技が使える</td><td><b>集中加工</b>(150%×1.75、IQ+2)が主砲。CPが底なら<b>秘訣</b>でCP+20。仕上げ域なら<b>ビエルゴ</b></td></tr>
+    <tr><td><span class="cond-tag" style="background:#7ec8f0">高進捗</span></td><td>作業系の進捗+50%</td><td>工数を残しているなら<b>下地作業/模範作業</b>で一気に稼ぐ</td></tr>
+    <tr><td><span class="cond-tag" style="background:#8de0a8">高能率</span></td><td>CP消費が半分</td><td><b>マニピュレーション/長期倹約/パーフェクトメンド</b>など重いバフをここで撃つ</td></tr>
+    <tr><td><span class="cond-tag" style="background:#6a8ff0;color:#fff">頑丈</span></td><td>耐久消費が半分</td><td>耐久10消費の技（<b>精密作業/加工系</b>）を撃つ。倹約加工より素加工が得</td></tr>
+    <tr><td><span class="cond-tag" style="background:#3f6ce0;color:#fff">頑強</span></td><td>耐久消費が半分＋次ターンは必ず頑丈</td><td>半減が2ターン確定。<b>下地加工2連打</b>など耐久の重い技を惜しまず撃つ</td></tr>
+    <tr><td><span class="cond-tag" style="background:#f0e06a">安定</span></td><td>成功率+25%</td><td>突貫作業を使う構成なら価値大。本構成では通常運用でOK</td></tr>
+    <tr><td><span class="cond-tag" style="background:#c98fe8">長持続</span></td><td>このターンに使ったバフ+2ターン</td><td><b>マニピュレーション/イノベーション/ヴェネレーション</b>をここで撃つ</td></tr>
+    <tr><td>通常</td><td>-</td><td>倹約加工でIQ積み、または計画通りの手</td></tr>
+  </table>
+  <p class="note">※「良兆候」（次ターン高品質の予告）はこのレシピでは出ない。高品質は不意に来るので、来たときに何を撃つか常に決めておくのがコツ。</p>
+
+  <h2>全体の流れ（3フェーズ）</h2>
+  <h2 style="font-size:0.85rem; border:none; padding-left:0;">① 工数フェーズ（ターン1〜7目安）</h2>
+  <ul>
+    <li>開幕<b>確信</b>（進捗300% + 次の作業系+100%）</li>
+    <li><b>ヴェネレーション</b> → <b>下地作業</b>（確信バフに乗せて大きく進める）</li>
+    <li>高進捗が来たら下地/模範作業、高品質が来たら集中作業</li>
+    <li>目標: 残り工数を<b>568以下</b>（模範作業1回分）にして止める。押し込みすぎ注意（最終確認で保険も可）</li>
+  </ul>
+  <h2 style="font-size:0.85rem; border:none; padding-left:0;">② 品質フェーズ（IQ10まで積む）</h2>
+  <ul>
+    <li>基本は<b>倹約加工</b>（耐久5でIQ+1）。頑丈・頑強が来たら素の加工系、高品質が来たら<b>集中加工</b>(IQ+2)か<b>秘訣</b></li>
+    <li>耐久管理は<b>マニピュレーション</b>優先。高能率のターンで撃てると理想（96→48CP）</li>
+    <li>高品質を1回も引けない時の保険に<b>一心不乱</b>（1回だけ集中加工/秘訣を条件無視で使える）</li>
+    <li>IQ10になったら<b>匠の神業</b>（耐久0で品質上げ）とイノベーションを絡めて品質を伸ばす</li>
+    <li>頑丈・頑強のときは<b>下地加工</b>（200%・IQ+2）が耐久10で撃てて最効率（頑強なら次ターンも頑丈確定で2連打可）。倹約中・頑丈時のIQ積みは<b>加工→洗練加工</b>コンボ（洗練はIQ+2）</li>
+    <li>CPが尽きたら<b>ヘイスティタッチ</b>（CP0・成功率60%）がタダで振れるサイコロ。成功直後は<b>デアリングタッチ</b>（CP0・150%・60%）に繋がるので必ず使う</li>
+    <li>工数フェーズで耐久が細いときは<b>倹約作業</b>（耐久5・180%）。※<b>匠の早業</b>は高難度レシピでは使用不可（ボタンも常に無効）</li>
+  </ul>
+  <h2 style="font-size:0.85rem; border:none; padding-left:0;">③ 仕上げ「グレスト祈り」（IQ10からが本番）</h2>
+  <ul>
+    <li>素のビエルゴだけでは31500に届かないことが多い。<b>イノベ＋グレストを維持したまま経過観察や設計変更で流し、高品質(1.75倍)が来た瞬間にビエルゴ</b>を叩き込むのが勝ち筋</li>
+    <li>高品質ビエルゴ（IQ10・GS・イノベ込み）はコスモツール効果込みで一撃約9,000。新式より一発が重く、祈りの回数が減る</li>
+    <li>残り品質と「ビエルゴ見込」チップを見比べて、届くならためらわず撃つ</li>
+    <li>品質31500を超えたら<b>模範作業</b>で完成。耐久が足りない時は匠の絶技（消費0）を仕上げに残しておくと安全</li>
+  </ul>
+  <p class="note">実際にクリアした人の弁: 「IQ10からが本番」「グレストコンボで高品質お祈り」「下振れしても最後まで完走させろ（低確率で素材が戻る）」</p>
+
+  <h2>見切りライン（リカバリー判断）</h2>
+  <ul>
+    <li>CPが200を切って品質が2万に届いていない → 完走しても31500に届かない公算大。<b>素材温存のため工数を完成させずに破棄</b>も選択肢（このシミュでは「最初から」）</li>
+    <li>設計変更（3回）は「高能率待ち」「高品質待ち」に使う。終盤のビエルゴ直前が最も価値が高い</li>
+    <li>クイックイノベーションはCP0でイノベ1ターン。ビエルゴ直前でCPが足りない時の非常口</li>
+  </ul>
+
+  <h2>計算の前提（このシミュの数値根拠）</h2>
+  <ul class="note">
+    <li>レシピ: rlvl776 / 除数180・180 / 補正100%（XIVAPI実データ。効率はLv100通常レシピと同じ）</li>
+    <li>デフォルトは<b>コスモツール最終（スターズ: 作業+1842/加工+976/CP+8）＋防具新式</b>想定: 作業精度5779 → 100%効率あたり進捗323、加工精度5502 → 品質340、CP657（設定タブで変更可、食事薬のCPも反映）</li>
+    <li>コスモツールの特殊効果<b>「高品質」時の品質上昇量1.75倍</b>（通常道具は1.5倍）を品質計算・おすすめ・勝算判定に反映済み。新式装備で挑む場合は<a href="../shinshiki/">新式版</a>を使うこと</li>
+    <li>出る状態は【通常・高品質・高進捗・高能率・頑丈・頑強・安定・長持続】の8種のみ。<b>最高品質・不調・良兆候は高難度レシピでは出ない</b>（検証者のリストと仕様解説で確認済み）。頑強（耐久半減＋次ターン必ず頑丈）は実プレイで確認済み</li>
+    <li>状態変化の出現率は<b>推定値</b>（高品質14% / 高進捗10% / 高能率14% / 頑丈11% / 頑強4% / 安定10% / 長持続12% / 通常25%、頑強の翌ターンは必ず頑丈）。実測と多少ズレる可能性あり。実際にプレイして「高品質がもっと出る」等が分かったら、このファイル内の CONDITIONS の数値を直せば精度が上がる</li>
+    <li>「おすすめ」はあくまで<b>判断の目安</b>。機械的におすすめだけを追った自動テストでは完走成功率は数%だった（惜敗2.9万台が多数）。状態の引きに合わせた人間の判断——特にビエルゴを撃つ/待つの見極め——で上積みするのが本番</li>
+  </ul>
+</div>
+
+<!-- ============ 設定ページ ============ -->
+<div id="page-set" class="page">
+  <div class="set-row"><label>作業精度<span class="hint">必要値5620。デフォルトはスターズ＋新式防具想定</span></label><input type="number" id="in-craft" value="5779"></div>
+  <div class="set-row"><label>加工精度<span class="hint">食事込みの実数値</span></label><input type="number" id="in-control" value="5502"></div>
+  <div class="set-row"><label>CP（装備のみ）<span class="hint">キャラ画面の素の値（スターズのCP+8込み）</span></label><input type="number" id="in-cp" value="657"></div>
+  <div class="set-row"><label>食事のCPボーナス<span class="hint">ゲーム内表示に合わせて修正可（概算+86）</span></label><input type="number" id="in-foodcp" value="86"></div>
+  <div class="set-row"><label>薬のCPボーナス<span class="hint">魔匠の薬液など（概算+21）</span></label><input type="number" id="in-potcp" value="21"></div>
+  <div class="set-row"><label>食事・薬を使う</label><input type="checkbox" id="in-usefood" checked></div>
+  <div class="set-row"><label>マイスター補正 +20/+20/+15<span class="hint">上のステータスが装備ページの値（証なし）ならON。ゲーム内キャラ画面の実測値（証込み）を入れたならOFF</span></label><input type="checkbox" id="in-meister" checked></div>
+  <p class="apply-note">※ 変更は「最初から」を押した次の製作から反映されます。作業/加工精度に食事分が付く場合はゲーム内のキャラクター画面の実数値をそのまま入れてください。</p>
+</div>
+</main>
+
+<script>
+"use strict";
+/* ========= レシピ定数（XIVAPI: Recipe 38246ほか / RecipeLevelTable 776） ========= */
+const RECIPE = {
+  difficulty: 11250,
+  maxQuality: 31520,
+  requiredQuality: 31500,
+  durability: 60,
+  progressDivider: 180,
+  qualityDivider: 180,
+  requiredCraftsmanship: 5620,
+};
+
+/* ========= 状態変化定義（出現率は既存エキスパートからの推定） ========= */
+const CONDITIONS = {
+  normal:    {name:"通常",   color:"#c8ccd8", p:0.25, desc:"特別な効果はない"},
+  good:      {name:"高品質", color:"#e85d5d", p:0.14, desc:"品質1.75倍（コスモツール効果） ／ 秘訣・集中加工・集中作業が使える"},
+  malleable: {name:"高進捗", color:"#7ec8f0", p:0.10, desc:"進捗1.5倍 ／ 作業系を撃つチャンス"},
+  pliant:    {name:"高能率", color:"#8de0a8", p:0.14, desc:"CP消費が半分 ／ 重いバフを撃つチャンス"},
+  sturdy:    {name:"頑丈",   color:"#6a8ff0", p:0.11, desc:"耐久消費が半分 ／ 耐久10の技を撃つチャンス"},
+  robust:    {name:"頑強",   color:"#3f6ce0", p:0.04, desc:"耐久消費が半分＋次ターンは必ず頑丈（半減2連チャンス）"},
+  centered:  {name:"安定",   color:"#f0e06a", p:0.10, desc:"成功率+25%（突貫作業などに影響）"},
+  primed:    {name:"長持続", color:"#c98fe8", p:0.12, desc:"このターンに使ったバフの持続+2"},
+};
+function isGoodish(c){ return c==="good"; }
+
+/* ========= プレイヤー設定 ========= */
+// コスモツール最終（スターズ: 作業+1842/加工+976/CP+8）＋防具は新式想定のデフォルト
+let player = { craft:5779, control:5502, cp:657, foodCp:86, potCp:21, useFood:true, meister:true };
+function effCraft(){ return player.craft + (player.meister?20:0); }
+function effControl(){ return player.control + (player.meister?20:0); }
+function maxCP(){ return player.cp + (player.meister?15:0) + (player.useFood ? player.foodCp + player.potCp : 0); }
+function baseProg(){ return Math.floor(effCraft()*10/RECIPE.progressDivider + 2); }
+function baseQual(){ return Math.floor(effControl()*10/RECIPE.qualityDivider + 35); }
+
+/* ========= アクション定義 =========
+   type: synth(作業系) / touch(加工系) / buff / other
+   dur: 基本耐久消費, cp: 基本CP */
+const ACTIONS = [
+  // 作業系
+  {id:"muscleMemory", name:"確信", type:"synth", cp:6, dur:10, eff:300, group:"synth",
+   note:"1ターン目限定", firstOnly:true},
+  {id:"basicSynth", name:"作業", type:"synth", cp:0, dur:10, eff:120, group:"synth"},
+  {id:"carefulSynth", name:"模範作業", type:"synth", cp:7, dur:10, eff:180, group:"synth"},
+  {id:"groundwork", name:"下地作業", type:"synth", cp:18, dur:20, eff:360, group:"synth",
+   note:"耐久不足時は効率半減"},
+  {id:"rapidSynth", name:"突貫作業", type:"synth", cp:0, dur:10, eff:500, group:"synth",
+   successRate:0.5, note:"成功率50%"},
+  {id:"prudentSynth", name:"倹約作業", type:"synth", cp:18, dur:5, eff:180, group:"synth",
+   noWasteNot:true, note:"耐久5で模範作業と同効率"},
+  {id:"intensiveSynth", name:"集中作業", type:"synth", cp:6, dur:10, eff:400, group:"synth",
+   goodOnly:true},
+  {id:"delicateSynth", name:"精密作業", type:"synth", cp:32, dur:10, eff:150, qualEff:100, group:"synth",
+   note:"進捗と品質を同時に"},
+  {id:"finalAppraisal", name:"最終確認", type:"other", cp:1, dur:0, group:"synth",
+   noStep:true, note:"完成を1回防ぐ(5T)"},
+  // 加工系
+  {id:"reflect", name:"真価", type:"touch", cp:6, dur:10, eff:300, group:"touch",
+   firstOnly:true, iqGain:2, note:"1ターン目限定"},
+  {id:"basicTouch", name:"加工", type:"touch", cp:18, dur:10, eff:100, group:"touch"},
+  {id:"standardTouch", name:"中級加工", type:"touch", cp:32, dur:10, eff:125, group:"touch",
+   comboFrom:"basicTouch", comboCp:18},
+  {id:"advancedTouch", name:"上級加工", type:"touch", cp:46, dur:10, eff:150, group:"touch",
+   comboFrom:"standardTouch|observe", comboCp:18},
+  {id:"refinedTouch", name:"洗練加工", type:"touch", cp:24, dur:10, eff:100, group:"touch",
+   note:"加工コンボでIQ+2"},
+  {id:"preparatoryTouch", name:"下地加工", type:"touch", cp:40, dur:20, eff:200, group:"touch",
+   iqGain:2, note:"200%・IQ+2・耐久20"},
+  {id:"prudentTouch", name:"倹約加工", type:"touch", cp:25, dur:5, eff:100, group:"touch",
+   noWasteNot:true, note:"倹約中は使用不可"},
+  {id:"hastyTouch", name:"ヘイスティタッチ", type:"touch", cp:0, dur:10, eff:100, group:"touch",
+   successRate:0.6, note:"CP0・成功率60%"},
+  {id:"daringTouch", name:"デアリングタッチ", type:"touch", cp:0, dur:10, eff:150, group:"touch",
+   successRate:0.6, needExpedience:true, note:"ヘイスティ成功直後のみ"},
+  {id:"preciseTouch", name:"集中加工", type:"touch", cp:18, dur:10, eff:150, group:"touch",
+   goodOnly:true, iqGain:2},
+  {id:"trainedFinesse", name:"匠の神業", type:"touch", cp:32, dur:0, eff:100, group:"touch",
+   needIq:10, note:"IQ10限定・耐久消費なし"},
+  {id:"byregot", name:"ビエルゴの祝福", type:"touch", cp:24, dur:10, group:"touch",
+   byregot:true, note:"IQ消費で大品質"},
+  // バフ
+  {id:"veneration", name:"ヴェネレーション", type:"buff", cp:18, dur:0, group:"buff", buff:"veneration", steps:4},
+  {id:"innovation", name:"イノベーション", type:"buff", cp:18, dur:0, group:"buff", buff:"innovation", steps:4},
+  {id:"greatStrides", name:"ｸﾞﾚｰﾄｽﾄﾗｲﾄﾞ", type:"buff", cp:32, dur:0, group:"buff", buff:"greatStrides", steps:3},
+  {id:"wasteNot", name:"倹約", type:"buff", cp:56, dur:0, group:"buff", buff:"wasteNot", steps:4},
+  {id:"wasteNot2", name:"長期倹約", type:"buff", cp:98, dur:0, group:"buff", buff:"wasteNot", steps:8},
+  {id:"manipulation", name:"ﾏﾆﾋﾟｭﾚｰｼｮﾝ", type:"buff", cp:96, dur:0, group:"buff", buff:"manipulation", steps:8},
+  {id:"observe", name:"経過観察", type:"buff", cp:7, dur:0, group:"buff", note:"→上級加工がコンボに"},
+  // 回復・特殊
+  {id:"mastersMend", name:"マスターズメンド", type:"other", cp:88, dur:0, group:"misc", note:"耐久+30"},
+  {id:"immaculateMend", name:"ﾊﾟｰﾌｪｸﾄﾒﾝﾄﾞ", type:"other", cp:112, dur:0, group:"misc", note:"耐久全回復"},
+  {id:"trainedPerfection", name:"匠の絶技", type:"other", cp:0, dur:0, group:"misc",
+   oncePerCraft:"tp", noStepBuff:true, note:"次の技の耐久消費0(1回)"},
+  {id:"tricks", name:"秘訣", type:"other", cp:0, dur:0, group:"misc", goodOnly:true, note:"CP+20"},
+  {id:"carefulObservation", name:"設計変更", type:"other", cp:0, dur:0, group:"misc",
+   limited:"co", limit:3, noStep:true, note:"状態を引き直す(3回)"},
+  {id:"heartAndSoul", name:"一心不乱", type:"other", cp:0, dur:0, group:"misc",
+   oncePerCraft:"hs", noStep:true, note:"高品質限定技を1回解禁"},
+  {id:"quickInnovation", name:"ｸｲｯｸｲﾉﾍﾞｰｼｮﾝ", type:"other", cp:0, dur:0, group:"misc",
+   oncePerCraft:"qi", noStep:true, note:"イノベ1T付与(1回)"},
+  {id:"trainedEye", name:"匠の早業", type:"other", cp:250, dur:0, group:"misc",
+   neverUsable:true, note:"高難度レシピでは使用不可"},
+];
+const A = Object.fromEntries(ACTIONS.map(a=>[a.id,a]));
+
+/* ========= 製作状態 ========= */
+let st = null;
+let undoStack = [];
+let followMode = false;   // 実機モード: 状態変化・突貫の成否を手入力
+let pendingRapid = null;  // 実機モードで突貫の結果待ち
+let forcedRoll = null;    // 突貫の成否を外から与えるとき用
+
+function setMode(follow){
+  followMode = follow;
+  pendingRapid = null;
+  document.getElementById("mode-practice").classList.toggle("on", !follow);
+  document.getElementById("mode-follow").classList.toggle("on", follow);
+  render();
+}
+function pickCondition(k){
+  st.awaitCond = false;
+  st.condition = k;
+  render();
+}
+
+function newState(){
+  return {
+    step:1, progress:0, quality:0, durability:RECIPE.durability, cp:maxCP(),
+    iq:0, condition:"normal",
+    buffs:{ veneration:0, innovation:0, greatStrides:0, wasteNot:0, manipulation:0,
+            muscleMemory:0, finalAppraisal:0, expedience:0 },
+    tpReady:false, tpUsed:false, hsActive:false, hsUsed:false, qiUsed:false, coLeft:3,
+    lastAction:null, finished:false, failed:false, resultText:"", awaitCond:false,
+    history:[],
+  };
+}
+
+function rollCondition(){
+  let r = Math.random(), acc=0;
+  for(const [k,c] of Object.entries(CONDITIONS)){ acc+=c.p; if(r<acc) return k; }
+  return "normal";
+}
+
+/* ========= 使用可否 ========= */
+function canUse(a){
+  if(st.finished||st.failed) return false;
+  if(st.awaitCond || pendingRapid) return false;
+  if(a.firstOnly && st.step!==1) return false;
+  if(a.id==="muscleMemory"||a.id==="reflect"){ if(st.step!==1) return false; }
+  if(a.neverUsable) return false;
+  if(a.needExpedience && !(st.buffs.expedience>0)) return false;
+  if(a.goodOnly && !isGoodish(st.condition) && !st.hsActive) return false;
+  if(a.needIq && st.iq<a.needIq) return false;
+  if(a.byregot && st.iq<1) return false;
+  if(a.noWasteNot && st.buffs.wasteNot>0) return false;
+  if(a.oncePerCraft==="tp" && st.tpUsed) return false;
+  if(a.oncePerCraft==="hs" && st.hsUsed) return false;
+  if(a.oncePerCraft==="qi" && st.qiUsed) return false;
+  if(a.limited==="co" && st.coLeft<=0) return false;
+  if(a.id==="finalAppraisal" && st.buffs.finalAppraisal>0) return false;
+  if(cpCost(a)>st.cp) return false;
+  return true;
+}
+
+function cpCost(a){
+  let c = a.cp;
+  if(a.comboFrom && st.lastAction && a.comboFrom.split("|").includes(st.lastAction)) c = a.comboCp;
+  if(st.condition==="pliant") c = Math.ceil(c/2);
+  return c;
+}
+
+function durCost(a){
+  let d = a.dur;
+  if(d===0) return 0;
+  if(st.tpReady) return 0;
+  if(st.buffs.wasteNot>0) d = d/2;
+  if(st.condition==="sturdy"||st.condition==="robust") d = d/2;
+  return Math.ceil(d);
+}
+
+/* ========= 計算 ========= */
+const EPS = 1e-9; // 浮動小数の丸め誤差対策(335*1.4=468.999…等)
+function progGain(a, effOverride){
+  let eff = (effOverride!==undefined?effOverride:a.eff)/100;
+  let mult = 1;
+  if(st.buffs.veneration>0) mult += 0.5;
+  if(st.buffs.muscleMemory>0) mult += 1.0;
+  let cond = (st.condition==="malleable") ? 1.5 : 1;
+  return Math.floor(baseProg() * eff * cond * mult + EPS);
+}
+function qualGain(a, effOverride){
+  let eff = (effOverride!==undefined?effOverride:(a.byregot?100+20*st.iq:a.qualEff!==undefined?a.qualEff:a.eff))/100;
+  let iqMult = 1 + 0.1*st.iq;
+  let mult = 1;
+  if(st.buffs.innovation>0) mult += 0.5;
+  if(st.buffs.greatStrides>0) mult += 1.0;
+  let cond = st.condition==="good" ? 1.75 : 1; // コスモツール(スターズ)効果: 高品質時1.75倍
+  return Math.floor(Math.floor(baseQual()*iqMult + EPS) * eff * cond * mult + EPS);
+}
+function byregotEstimate(){
+  // 見込み表示用: 現在のIQ・バフ込み、状態は通常想定
+  let eff = (100+20*st.iq)/100;
+  let mult = 1 + (st.buffs.innovation>0?0.5:0) + (st.buffs.greatStrides>0?1.0:0);
+  return Math.floor(Math.floor(baseQual()*(1+0.1*st.iq)+EPS) * eff * mult + EPS);
+}
+function byregotNow(){ return qualGain(A.byregot); } // 今この瞬間に撃った場合の正確な値（状態込み）
+
+/* ========= アクション実行 ========= */
+function doAction(id){
+  const a = A[id];
+  if(!canUse(a)) return;
+  // 実機モードの突貫作業: 結果をユーザーに聞く
+  if(followMode && a.successRate!==undefined && forcedRoll===null){
+    pendingRapid = id;
+    render();
+    return;
+  }
+  undoStack.push(JSON.parse(JSON.stringify(st)));
+  if(undoStack.length>50) undoStack.shift();
+
+  const condKey = st.condition;
+  const cost = cpCost(a);
+  st.cp -= cost;
+
+  let logTxt = "";
+
+  // 特殊: ステップを消費しない系
+  if(a.id==="carefulObservation"){
+    st.coLeft--;
+    if(followMode){ st.awaitCond = true; } else { st.condition = rollCondition(); }
+    pushHist(condKey, a.name, "状態を引き直した");
+    render(); return;
+  }
+  if(a.id==="heartAndSoul"){
+    st.hsUsed=true; st.hsActive=true;
+    pushHist(condKey, a.name, "高品質限定技を1回解禁");
+    render(); return;
+  }
+  if(a.id==="quickInnovation"){
+    st.qiUsed=true;
+    if(st.buffs.innovation<=0) st.buffs.innovation = 1;
+    pushHist(condKey, a.name, "イノベーション1T付与");
+    render(); return;
+  }
+  if(a.id==="finalAppraisal"){
+    st.buffs.finalAppraisal = 5;
+    pushHist(condKey, a.name, "完成防止(5T)");
+    render(); return;
+  }
+  if(a.id==="trainedPerfection"){
+    st.tpUsed=true; st.tpReady=true;
+    // 匠の絶技はステップを消費する
+  }
+
+  const dcost = durCost(a);
+  if(a.dur>0 && st.tpReady){ st.tpReady=false; }
+
+  let gainedP=0, gainedQ=0, failedRoll=false;
+
+  // 成功判定（突貫・ヘイスティ・デアリング）
+  let success = true;
+  if(a.successRate!==undefined){
+    let rate = a.successRate;
+    if(condKey==="centered") rate = Math.min(1, rate+0.25);
+    const roll = forcedRoll!==null ? forcedRoll : Math.random();
+    forcedRoll = null;
+    success = roll < rate;
+  }
+  if(a.type==="synth" || a.qualEff!==undefined){
+    if(success){
+      // 下地作業: 消費予定耐久より残耐久が少なければ効率半減
+      gainedP = progGain(a, a.id==="groundwork" && st.durability < dcost ? a.eff/2 : a.eff);
+      if(a.goodOnly && !isGoodish(condKey) && st.hsActive){ st.hsActive=false; }
+      st.progress = Math.min(RECIPE.difficulty, st.progress + gainedP);
+      if(st.buffs.muscleMemory>0) st.buffs.muscleMemory = 0; // 消費
+      if(a.qualEff!==undefined){ // 精密作業
+        gainedQ = qualGain(a, a.qualEff);
+        st.quality = Math.min(RECIPE.maxQuality, st.quality + gainedQ);
+        st.iq = Math.min(10, st.iq+1);
+        if(st.buffs.greatStrides>0) st.buffs.greatStrides=0;
+      }
+    } else { failedRoll = true; }
+  } else if(a.type==="touch"){
+    if(a.goodOnly && !isGoodish(condKey) && st.hsActive){ st.hsActive=false; }
+    if(success){
+      gainedQ = qualGain(a);
+      st.quality = Math.min(RECIPE.maxQuality, st.quality + gainedQ);
+      if(a.byregot){ st.iq = 0; }
+      else {
+        let g = a.iqGain||1;
+        if(a.id==="refinedTouch" && st.lastAction==="basicTouch") g = 2; // 加工コンボ
+        st.iq = Math.min(10, st.iq + g);
+      }
+      if(st.buffs.greatStrides>0) st.buffs.greatStrides=0;
+      if(a.id==="hastyTouch") st.buffs.expedience = 1; // 成功で「勢い」→デアリング解禁
+    } else { failedRoll = true; }
+  } else if(a.type==="buff"){
+    if(a.buff){
+      let steps = a.steps + (condKey==="primed"?2:0);
+      st.buffs[a.buff] = steps;
+    }
+  } else if(a.id==="tricks"){
+    st.cp = Math.min(maxCP(), st.cp+20);
+    if(!isGoodish(condKey) && st.hsActive){ st.hsActive=false; }
+  } else if(a.id==="mastersMend"){
+    st.durability = Math.min(RECIPE.durability, st.durability+30);
+  } else if(a.id==="immaculateMend"){
+    st.durability = RECIPE.durability;
+  }
+  if(a.id==="muscleMemory"){ st.buffs.muscleMemory = 5 + (condKey==="primed"?2:0); }
+  if(a.id==="reflect"){ st.iq = 2; }
+
+  st.durability -= dcost;
+
+  // 完成判定
+  if(st.progress >= RECIPE.difficulty){
+    if(st.buffs.finalAppraisal>0){
+      st.progress = RECIPE.difficulty-1;
+      st.buffs.finalAppraisal = 0;
+      logTxt = "（最終確認で完成を防止）";
+    } else {
+      finishCraft(condKey, a, gainedP, gainedQ);
+      return;
+    }
+  }
+  // 耐久0で未完成 → 失敗
+  if(st.durability <= 0){
+    st.failed = true;
+    st.resultText = "耐久0で製作失敗…素材ロスト";
+    pushHist(condKey, a.name, gainTxt(gainedP,gainedQ,failedRoll)+" → 耐久0");
+    render(); return;
+  }
+
+  // ステップ経過処理
+  pushHist(condKey, a.name, gainTxt(gainedP,gainedQ,failedRoll)+logTxt);
+  endStep(a);
+  render();
+}
+
+function gainTxt(p,q,fail){
+  if(fail) return "失敗！";
+  let t=[];
+  if(p>0) t.push("工数+"+p);
+  if(q>0) t.push("品質+"+q);
+  return t.join(" ") || "";
+}
+
+function endStep(a){
+  // マニピュレーション回復（このステップで掛けた場合は回復しない）
+  if(st.buffs.manipulation>0 && a.buff!=="manipulation" && st.durability>0){
+    st.durability = Math.min(RECIPE.durability, st.durability+5);
+  }
+  // バフ減少（このステップで掛けたバフも1減る仕様に合わせ、掛けた直後は-1しない実装：
+  //   FF14では掛けたターンは減らないため、直前にセットしたものは除外）
+  for(const k of Object.keys(st.buffs)){
+    if(a.buff===k) continue;
+    if(a.id==="muscleMemory" && k==="muscleMemory") continue;
+    if(a.id==="hastyTouch" && k==="expedience") continue; // 勢いは次のターンまで生かす
+    if(st.buffs[k]>0) st.buffs[k]--;
+  }
+  st.lastAction = a.id;
+  st.step++;
+  if(st.condition==="robust"){ st.condition = "sturdy"; } // 頑強の直後は必ず頑丈（実機モードでも自動）
+  else if(followMode){ st.awaitCond = true; }
+  else { st.condition = rollCondition(); }
+}
+function resolveRapid(ok){
+  const id = pendingRapid;
+  pendingRapid = null;
+  forcedRoll = ok ? 0 : 1;
+  doAction(id);
+  forcedRoll = null;
+}
+
+function finishCraft(condKey, a, gp, gq){
+  st.finished = true;
+  const ok = st.quality >= RECIPE.requiredQuality;
+  if(ok){
+    st.resultText = "完成！品質" + st.quality.toLocaleString() + "（ライン31500クリア）";
+  } else {
+    st.failed = true;
+    st.resultText = "工数は完了したが品質" + st.quality.toLocaleString() + " ＜ 31500 → 製作失敗…";
+  }
+  pushHist(condKey, a.name, gainTxt(gp,gq,false)+" → 完成判定");
+  render();
+}
+
+function pushHist(condKey, act, detail){
+  st.history.unshift({step:st.step, cond:condKey, act, detail});
+}
+
+/* ========= おすすめエンジン（ヒューリスティック） ========= */
+// その手を撃つと耐久0で失敗する（＝完成もしない）か
+function wouldDie(id){
+  const a = A[id];
+  const d = durCost(a);
+  if(d<=0 || st.durability - d > 0) return false;
+  if(a.type!=="synth") return true;
+  if(a.successRate!==undefined) return true; // 突貫は外れたら即死なので賭けない
+  const gain = progGain(a, a.id==="groundwork" && st.durability<d ? a.eff/2 : a.eff);
+  return st.progress + gain < RECIPE.difficulty;
+}
+function recommend(){
+  if(st.finished||st.failed) return null;
+  const rec = recommendCore();
+  if(rec && canUse(A[rec.id]) && !wouldDie(rec.id)) return rec;
+  // 本命が撃てない/死ぬ場合: 延命・代替手
+  for(const id of ["trainedPerfection","manipulation","mastersMend","immaculateMend","trainedFinesse","tricks","observe","carefulObservation","prudentTouch","hastyTouch","basicTouch","byregot","carefulSynth","basicSynth"]){
+    if(canUse(A[id]) && !wouldDie(id)) return {id, reason:"（安全手）本命だと耐久0で失敗するため、延命できる手・実行可能な手から提案"};
+  }
+  for(const id of ["carefulSynth","basicSynth","rapidSynth"]){
+    if(canUse(A[id])) return {id, reason:"耐久が尽きる。完成に賭けるしかない"};
+  }
+  return null;
+}
+function recommendCore(){
+  const cond = st.condition;
+  const remP = RECIPE.difficulty - st.progress;
+  const remQ = RECIPE.requiredQuality - st.quality;
+  const careful = Math.floor(baseProg()*1.8);
+  const progDone = remP <= careful; // 模範作業1回で完成できる位置
+  const by = byregotEstimate();
+
+  const r = (id, reason)=>({id, reason});
+
+  // 1ターン目
+  if(st.step===1) return r("muscleMemory","開幕は確信で進捗300%＋次の作業系を強化。工数フェーズを短く済ませるのが基本形");
+
+  // 今ビエルゴを撃てば品質ラインに届くなら、何より優先で撃つ
+  if(remQ>0 && st.iq>=1 && st.cp>=cpCost(A.byregot) && byregotNow() >= remQ && st.durability>durCost(A.byregot))
+    return r("byregot","今のビエルゴ("+byregotNow().toLocaleString()+")で品質31500に届く！ためらわず撃つ");
+
+
+  // 品質達成済み → 完成させる
+  if(remQ<=0){
+    if(st.cp>=cpCost(A.carefulSynth)) return r("carefulSynth","品質ライン達成済み。模範作業で完成させる");
+    return r("basicSynth","品質達成済み。CP不足のため作業で完成させる");
+  }
+
+  // === 工数フェーズ ===
+  if(!progDone){
+    const gwCost = durCost(A.groundwork);
+    // 耐久維持を最優先（残り耐久が下地1回分を切ったら手当て）
+    if(st.durability<=12 && st.buffs.muscleMemory<=0){
+      if(cond==="pliant" && st.buffs.manipulation<=0 && st.cp>=48) return r("manipulation","高能率でマニピュレーションが48CP。耐久が危険なので最優先");
+      if(st.buffs.manipulation<=0 && st.cp>=96) return r("manipulation","耐久が危険水域。マニピュレーションで立て直す");
+      if(st.cp>=88) return r("mastersMend","耐久が危険水域。マスターズメンドで回復");
+      if(!st.tpUsed) return r("trainedPerfection","CPがない。匠の絶技で次の技を耐久消費0に");
+    }
+    if(st.buffs.muscleMemory>0){
+      if(st.buffs.veneration<=0 && st.cp>=18) return r("veneration","確信バフが残っているうちにヴェネレーションを掛けて下地作業に繋ぐ");
+      if(st.durability>gwCost) return r("groundwork","確信＋ヴェネレーションが乗るうちに下地作業で大きく進める"+(cond==="malleable"?"（高進捗でさらに1.5倍！）":""));
+      return r("carefulSynth","耐久が心もとないので模範作業で確実に（確信は乗る）");
+    }
+    if(cond==="good" && st.cp>=cpCost(A.intensiveSynth)) return r("intensiveSynth","高品質なので集中作業（効率400%）で工数を稼ぐ");
+    if(cond==="malleable") return r(st.durability>gwCost+10?"groundwork":"carefulSynth","高進捗(+50%)。作業系で一気に進める");
+    if(cond==="pliant" && st.buffs.manipulation<=0 && st.durability<=45 && st.cp>=48) return r("manipulation","高能率でマニピュレーションが48CP。工数フェーズの耐久を支える");
+    if(st.buffs.veneration<=0 && remP>careful*4 && st.cp>=18) return r("veneration","工数がまだ長い。ヴェネレーションを掛け直す");
+    if(st.durability>15 && remP > progGain(A.rapidSynth)+400)
+      return r("rapidSynth","CP0の突貫作業で耐久あたりの進捗を稼ぐ（CP温存が生命線）。当たっても完成しない位置"+(cond==="centered"?"（安定で成功率75%！）":"（成功率50%）"));
+    if(st.durability<=20 && st.cp>=cpCost(A.prudentSynth) && remP > progGain(A.prudentSynth)+100)
+      return r("prudentSynth","耐久が細い。倹約作業(耐久5・効率180%)で刻む");
+    if(remP > progGain(A.carefulSynth)+100) return r("carefulSynth","模範作業で堅実に工数を進める。残り568以下になったら品質フェーズへ");
+    return r("basicSynth","模範作業だと完成してしまう位置。作業(120%)で刻んで品質フェーズへ渡す");
+  }
+
+  // === 仕上げ判定: ビエルゴで届くか ===
+  const gsInnovReady = st.buffs.greatStrides>0 && st.buffs.innovation>0;
+  if(st.iq>=8 && remQ <= by*(cond==="good"?1.75:1) && gsInnovReady){
+    return r("byregot","GS＋イノベが乗った状態でビエルゴ圏内。撃って仕上げる"+(cond==="good"?"（高品質でさらに1.75倍！）":""));
+  }
+  if(st.iq>=8 && remQ <= by && st.buffs.innovation>0 && st.buffs.greatStrides<=0 && st.cp>=cpCost(A.greatStrides)+24){
+    return r("greatStrides","ビエルゴ圏内。グレートストライドを掛けてから撃つ");
+  }
+  if(st.iq>=10 && remQ<=by*1.6 && st.buffs.innovation<=0 && st.cp>=18+32+24){
+    return r("innovation","仕上げ準備。イノベーション→GS→ビエルゴの順で最大打点");
+  }
+
+  // === 品質フェーズ ===
+  // 高品質: 集中加工が品質の主砲。CPが底のときだけ秘訣
+  if(cond==="good"){
+    if(st.iq>=8 && remQ <= by*1.75 && (st.buffs.greatStrides>0||st.buffs.innovation>0) && st.cp>=cpCost(A.byregot))
+      return r("byregot","高品質×ビエルゴ！1.75倍が乗る最大の一撃で仕上げる");
+    if(st.cp>=cpCost(A.preciseTouch)) return r("preciseTouch","高品質は集中加工（150%×1.75、IQ+2）。品質/CP効率が全技で最強");
+    return r("tricks","集中加工すら撃てない。秘訣でCP+20回収");
+  }
+  // ヘイスティ成功の勢い: デアリングタッチ(CP0・150%)は逃さない
+  if(st.buffs.expedience>0 && !isGoodish(cond) && st.durability>durCost(A.daringTouch))
+    return r("daringTouch","ヘイスティ成功の勢い！デアリングタッチ(CP0・効率150%・成功率60%)はタダで振れる大サイコロ");
+
+  // CP終端の手仕舞い: ビエルゴを撃たずにCPが尽きるのが最悪
+  if(st.iq>=6 && st.cp < 70 && st.durability>10 && st.cp>=cpCost(A.byregot)){
+    if(!st.qiUsed && st.buffs.innovation<=0) return r("quickInnovation","CP残がビエルゴ1回分。クイックイノベーション(0CP)を乗せてから撃つ");
+    // 素で届かないが高品質(1.5倍)なら届く → 残CPの許す限り祈る
+    if(remQ > byregotNow() && remQ <= Math.floor(byregotEstimate()*1.75)){
+      if(cond==="normal" && st.coLeft>0) return r("carefulObservation","素のビエルゴでは届かない。設計変更で高品質を釣って1.75倍ビエルゴ");
+      if(st.cp >= cpCost(A.observe)+24) return r("observe","素のビエルゴでは届かない。経過観察で流して高品質ビエルゴを祈る（残CP分だけ粘れる）");
+    }
+    return r("byregot","CPが尽きる前にビエルゴで出し切って手仕舞い。ここで届かなければその製作は負け筋");
+  }
+  // 高能率: 重いものを半額で
+  if(cond==="pliant"){
+    if(st.buffs.manipulation<=0 && st.durability<=40 && st.cp>=48) return r("manipulation","高能率でマニピュレーションが48CP。耐久管理の柱");
+    if(st.durability<=15 && st.cp>=56) return r("immaculateMend","高能率でパーフェクトメンド56CP。耐久全回復");
+    if(st.buffs.innovation<=0 && st.iq>=6 && st.cp>=9) return r("innovation","高能率でイノベーション9CP");
+    if(st.iq<10 && st.durability>5 && st.cp>=13) return r("prudentTouch","高能率で倹約加工が13CP。お得にIQを積む");
+  }
+  // 耐久ガード: 次の一手で耐久0にならないように
+  if(st.durability<=10 && st.iq>=10 && st.cp>=cpCost(A.trainedFinesse)) return r("trainedFinesse","耐久を使わず匠の神業で品質を伸ばす");
+  if(st.durability<=5 || (st.durability<=10 && st.buffs.manipulation<=0)){
+    if(cond==="pliant" && st.cp>=48) return r("manipulation","高能率でマニピュレーション48CP");
+    if(st.buffs.manipulation<=0 && st.cp>=96+50) return r("manipulation","耐久が危険水域。マニピュレーションで立て直す");
+    if(!st.tpUsed) return r("trainedPerfection","匠の絶技で次の技を耐久消費0に（CP節約）");
+    if(st.cp>=112+30) return r("immaculateMend","パーフェクトメンドで耐久全回復");
+    if(st.cp>=88+30) return r("mastersMend","マスターズメンドで耐久回復");
+  }
+  // 頑丈/頑強: 耐久10の技が半額（頑強なら次ターンも頑丈確定）
+  if((cond==="sturdy"||cond==="robust") && st.iq<10 && st.buffs.wasteNot<=0 && st.durability>5){
+    if(st.iq<=8 && st.cp>=cpCost(A.preparatoryTouch) && st.durability>durCost(A.preparatoryTouch))
+      return r("preparatoryTouch", cond==="robust"
+        ? "頑強は次ターンも頑丈確定。下地加工（耐久10で200%＋IQ+2）を2連打できる大チャンス"
+        : "頑丈なら下地加工が耐久10で効率200%＋IQ+2。一番おいしい使い方");
+    return r(st.lastAction==="basicTouch"?"refinedTouch":"basicTouch","頑丈は耐久10の技が5で済む。加工→洗練加工コンボでIQを積む(洗練はIQ+2)");
+  }
+  // 長持続: バフを伸ばす
+  if(cond==="primed"){
+    if(st.buffs.manipulation<=0 && st.cp>=96+50 && st.durability<=40) return r("manipulation","長持続でマニピュレーションが10ターン持続");
+    if(st.buffs.innovation<=0 && st.iq>=6 && st.cp>=18+50) return r("innovation","長持続でイノベーション6ターン。加工を重ねる");
+  }
+  // IQ積み基本形（イノベーションを維持しながら倹約加工）
+  if(st.iq<10){
+    if(st.buffs.wasteNot>0) return r(st.lastAction==="basicTouch"?"refinedTouch":"basicTouch","倹約中は倹約加工が使えない。加工→洗練加工コンボでIQを積む(洗練はIQ+2)");
+    if(st.buffs.innovation<=0 && st.iq>=2 && st.cp>=18+50) return r("innovation","イノベーションを維持して加工1回あたりの品質を1.5倍に");
+    if(st.cp>=cpCost(A.prudentTouch) && st.durability>5) return r("prudentTouch","倹約加工で耐久5のままIQを積む（基本形）");
+    if(st.coLeft>0) return r("carefulObservation","CPが苦しい。設計変更で高品質（秘訣/集中加工）か高能率を釣る");
+    if(!st.hsUsed) return r("heartAndSoul","一心不乱→秘訣でCPを回収する非常口");
+    if(st.hsActive) return r("tricks","一心不乱が有効。秘訣でCP+20");
+    if(st.durability>durCost(A.hastyTouch)) return r("hastyTouch","CPが尽きた。ヘイスティタッチ(CP0・成功率60%)でIQガチャ。成功すればデアリングも");
+  } else {
+    // IQ10: イノベを維持して絶技/集中で品質を伸ばし、最後は必ずビエルゴ
+    if(st.buffs.innovation<=0 && st.cp>=18+32+24) return r("innovation","IQ10。イノベーションを掛けて品質を伸ばす");
+    // グレスト祈り: 素のビエルゴでは届かないがGS+高品質なら届く域
+    if(st.buffs.greatStrides>0 && remQ > by && st.buffs.innovation>0){
+      if(cond==="normal" && st.coLeft>0) return r("carefulObservation","GSを維持したまま設計変更で高品質を釣る");
+      if(st.cp>=cpCost(A.observe)) return r("observe","GS＋イノベを維持して経過観察で流し、高品質ビエルゴを待つ（お祈りタイム）");
+    }
+    if(st.buffs.greatStrides<=0 && st.buffs.innovation>0 && remQ > by && remQ <= by*4 && st.cp>=32+24+21)
+      return r("greatStrides","素のビエルゴでは届かない。グレストを張って高品質(1.75倍)ビエルゴを祈る");
+    if(cond==="normal" && st.coLeft>0 && remQ > by*1.2 && st.buffs.innovation>0) return r("carefulObservation","設計変更で高品質を釣る（IQ10×イノベの集中加工は一撃2200超）");
+    if(!st.hsUsed && remQ > by*1.2 && st.buffs.innovation>0 && st.cp>=cpCost(A.preciseTouch)+24) return r("heartAndSoul","一心不乱で集中加工を解禁（イノベ込みで一撃1500超）");
+    if(st.hsActive && st.cp>=cpCost(A.preciseTouch)) return r("preciseTouch","一心不乱が有効。集中加工で大きく品質を積む");
+    if(st.buffs.innovation>0 && st.cp>=cpCost(A.trainedFinesse)+24) return r("trainedFinesse","イノベ中に匠の神業（耐久0）で品質を積む");
+    if(st.buffs.innovation<=0 && !st.qiUsed) return r("quickInnovation","CPが細い。クイックイノベーション(0CP)でイノベを乗せる");
+    if(st.cp<32 && st.durability>durCost(A.hastyTouch)) return r("hastyTouch","CP切れ。ヘイスティタッチ(CP0・60%)のガチャで品質を拾う");
+  }
+  if(!st.qiUsed && st.cp<50 && st.iq>=6) return r("quickInnovation","CP切れ間際。クイックイノベーション→ビエルゴの非常口");
+  if(st.iq>=1 && st.cp>=cpCost(A.byregot) && st.durability>10) return r("byregot","CPが尽きる前にビエルゴで品質を出し切る");
+  // 万策尽きた: 完走しても品質未達
+  return r("carefulSynth","CP切れで品質31500に届かない。実戦なら見切って作り直し（練習として完成まで進めてもOK）");
+}
+
+/* ========= 勝算判定（概算モデル） ========= */
+function assess(){
+  if(st.finished||st.failed) return null;
+  const bq = baseQual();
+  const remP = RECIPE.difficulty - st.progress;
+  const remQ = RECIPE.requiredQuality - st.quality;
+  if(remQ<=0) return {lv:"ok", head:"品質達成", text:"あとは模範作業で完成させるだけ。事故らないように"};
+
+  // 工数を終わらせるコスト（模範作業換算）
+  const nProg = Math.max(0, Math.ceil(remP / Math.floor(baseProg()*1.8)));
+  let cp = st.cp - nProg*7;
+  let dur = st.durability + (st.buffs.manipulation>0 ? Math.min(st.buffs.manipulation,8)*5 : 0);
+  let durNeed = nProg*10 + 10; // +ビエルゴ分
+  let q = 0;
+  // IQ10までのビルド（倹約加工換算）
+  const need = Math.max(0, 10-st.iq);
+  for(let k=st.iq; k<10; k++){ q += Math.floor(bq*(1+0.1*k)+EPS); }
+  cp -= need*25; durNeed += need*5;
+  // 仕上げ予約（イノベ18+GS32+ビエルゴ24）
+  cp -= 74;
+  // 耐久不足はマニピュレーションで補填
+  while(durNeed > dur && cp > 96){ cp -= 96; dur += 40; }
+  const durShort = durNeed > dur;
+  // 残CPは匠の神業(イノベ込み約36.5CP/回)に変換
+  const finesseN = Math.max(0, Math.floor(cp/36.5));
+  q += finesseN * Math.floor(Math.floor(bq*2+EPS)*1.5+EPS);
+  q += Math.floor(Math.floor(bq*2+EPS)*3*2.5+EPS); // GS+イノベのビエルゴ
+  // 上振れ期待: 高品質(集中加工/1.5倍ビエルゴ)
+  const turns = nProg + need + finesseN + 3;
+  const upside = q + Math.round(turns*0.14*1950); // 高品質(約14%)による集中加工/1.75倍ビエルゴの上積み期待（コスモツール効果で1.5倍時の約1.5倍）
+
+  const nums = `無風見込み${q.toLocaleString()} / 上振れ込み${upside.toLocaleString()} / 残り品質${remQ.toLocaleString()}`;
+  if(durShort && cp<=96) return {lv:"bad", head:"見切り推奨", text:`耐久もCPも足りない（${nums}）。工数だけ完成させて終了を（完走なら低確率で素材が返る）`};
+  if(q >= remQ)     return {lv:"ok",   head:"続行推奨", text:`高品質を引けなくても届く計算（${nums}）`};
+  if(upside >= remQ) return {lv:"pray", head:"続行（お祈り圏）", text:`高品質を引ければ届く（${nums}）。グレスト＋イノベを維持して祈る`};
+  return {lv:"bad", head:"見切り推奨", text:`上振れ込みでも届かない公算大（${nums}）。工数だけ完成させて終了を（完走なら低確率で素材が返る）`};
+}
+
+/* ========= リカバリー入力 ========= */
+function toggleRecovery(){
+  const p = document.getElementById("recPanel");
+  const show = p.style.display==="none";
+  if(show){
+    // 現在のシミュ値をプリセット（CP・ターン・IQは計算値を生かす）
+    document.getElementById("rec-prog").value = st.progress;
+    document.getElementById("rec-qual").value = st.quality;
+    document.getElementById("rec-dur").value = st.durability;
+    document.getElementById("rec-cp").value = st.cp;
+    document.getElementById("rec-iq").value = st.iq;
+    document.getElementById("rec-step").value = st.step;
+    document.getElementById("rec-co").value = st.coLeft;
+    document.getElementById("rec-ven").value = st.buffs.veneration;
+    document.getElementById("rec-innov").value = st.buffs.innovation;
+    document.getElementById("rec-gs").value = st.buffs.greatStrides;
+    document.getElementById("rec-wn").value = st.buffs.wasteNot;
+    document.getElementById("rec-manip").value = st.buffs.manipulation;
+    document.getElementById("rec-mume").value = st.buffs.muscleMemory;
+    document.getElementById("rec-hs").checked = st.hsUsed;
+    document.getElementById("rec-qi").checked = st.qiUsed;
+    document.getElementById("rec-tp").checked = st.tpUsed;
+    const sel = document.getElementById("rec-cond");
+    sel.innerHTML = Object.entries(CONDITIONS).map(([k,c])=>`<option value="${k}" ${k===st.condition?"selected":""}>${c.name}</option>`).join("");
+  }
+  p.style.display = show ? "" : "none";
+}
+function clampInt(id, lo, hi, fb){
+  const v = parseInt(document.getElementById(id).value, 10);
+  return isNaN(v) ? fb : Math.max(lo, Math.min(hi, v));
+}
+function applyRecovery(){
+  undoStack.push(JSON.parse(JSON.stringify(st)));
+  pendingRapid = null;
+  st.progress   = clampInt("rec-prog", 0, RECIPE.difficulty, st.progress);
+  st.quality    = clampInt("rec-qual", 0, RECIPE.maxQuality, st.quality);
+  st.durability = clampInt("rec-dur", 5, RECIPE.durability, st.durability);
+  st.cp         = clampInt("rec-cp", 0, maxCP(), st.cp);
+  st.iq         = clampInt("rec-iq", 0, 10, st.iq);
+  st.step       = clampInt("rec-step", 1, 99, st.step);
+  st.coLeft     = clampInt("rec-co", 0, 3, st.coLeft);
+  st.buffs.veneration   = clampInt("rec-ven", 0, 9, 0);
+  st.buffs.innovation   = clampInt("rec-innov", 0, 9, 0);
+  st.buffs.greatStrides = clampInt("rec-gs", 0, 9, 0);
+  st.buffs.wasteNot     = clampInt("rec-wn", 0, 12, 0);
+  st.buffs.manipulation = clampInt("rec-manip", 0, 12, 0);
+  st.buffs.muscleMemory = clampInt("rec-mume", 0, 9, 0);
+  st.hsUsed = document.getElementById("rec-hs").checked;
+  st.qiUsed = document.getElementById("rec-qi").checked;
+  st.tpUsed = document.getElementById("rec-tp").checked;
+  st.condition = document.getElementById("rec-cond").value;
+  st.awaitCond = false;
+  st.finished = false; st.failed = false; st.resultText = "";
+  st.history.unshift({step:st.step, cond:st.condition, act:"リカバリー入力", detail:`工数${st.progress} 品質${st.quality} 耐久${st.durability} CP${st.cp}`});
+  document.getElementById("recPanel").style.display = "none";
+  render();
+}
+
+/* ========= 描画 ========= */
+function pct(v,m){ return Math.max(0,Math.min(100, v/m*100)); }
+function render(){
+  document.getElementById("v-prog").textContent = st.progress.toLocaleString();
+  document.getElementById("v-qual").textContent = st.quality.toLocaleString();
+  document.getElementById("v-dur").textContent = st.durability;
+  document.getElementById("v-cp").textContent = st.cp;
+  document.getElementById("v-cpmax").textContent = maxCP();
+  document.getElementById("b-prog").style.width = pct(st.progress,RECIPE.difficulty)+"%";
+  document.getElementById("b-qual").style.width = pct(st.quality,RECIPE.maxQuality)+"%";
+  document.getElementById("b-qual").style.background = st.quality>=RECIPE.requiredQuality ? "var(--ok)" : "var(--qual)";
+  document.getElementById("b-dur").style.width = pct(st.durability,RECIPE.durability)+"%";
+  document.getElementById("b-cp").style.width = pct(st.cp,maxCP())+"%";
+  document.getElementById("v-iq").textContent = st.iq;
+  document.getElementById("v-byregot").textContent = st.iq>0 ? "+"+byregotEstimate().toLocaleString() : "-";
+  document.getElementById("v-remprog").textContent = Math.max(0,RECIPE.difficulty-st.progress).toLocaleString();
+  document.getElementById("v-remqual").textContent = Math.max(0,RECIPE.requiredQuality-st.quality).toLocaleString();
+  document.getElementById("stepNum").textContent = st.step;
+
+  // バフ表示
+  const br = document.getElementById("buffRow");
+  const buffNames = {veneration:"ヴェネ", innovation:"イノベ", greatStrides:"GS", wasteNot:"倹約",
+                     manipulation:"マニピュ", muscleMemory:"確信", finalAppraisal:"最終確認", expedience:"勢い"};
+  let bh = "";
+  for(const [k,n] of Object.entries(buffNames)){
+    if(st.buffs[k]>0) bh += `<div class="chip" style="flex:0 0 auto; border-color:var(--accent2);"><span class="k">${n}</span><span class="v">${st.buffs[k]}</span></div>`;
+  }
+  if(st.hsActive) bh += `<div class="chip" style="flex:0 0 auto; border-color:var(--good);"><span class="k">一心</span><span class="v">●</span></div>`;
+  if(st.tpReady) bh += `<div class="chip" style="flex:0 0 auto; border-color:var(--ok);"><span class="k">絶技</span><span class="v">●</span></div>`;
+  bh += `<div class="chip" style="flex:0 0 auto;"><span class="k">設計変更</span><span class="v">${st.coLeft}</span></div>`;
+  br.innerHTML = bh;
+
+  // 勝算判定
+  const vd = assess();
+  const vl = document.getElementById("verdictLine");
+  if(vd){
+    vl.className = "verdict "+vd.lv;
+    vl.innerHTML = `<b>${vd.head}</b> — ${vd.text}`;
+    vl.style.display = "";
+  } else { vl.style.display = "none"; }
+
+  // 状態
+  const c = CONDITIONS[st.condition];
+  document.getElementById("condOrb").style.setProperty("--orb", st.awaitCond ? "#555" : c.color);
+  document.getElementById("condName").textContent = st.awaitCond ? "状態を入力待ち" : c.name;
+  document.getElementById("condName").style.color = st.awaitCond ? "var(--sub)" : c.color;
+  document.getElementById("condDesc").textContent = st.awaitCond ? "下のボタンからゲーム画面の状態を選ぶ" : c.desc;
+  document.getElementById("condCard").style.borderColor = st.awaitCond ? "var(--line)" : c.color;
+
+  // 実機モード: 状態ピッカー
+  const pickBox = document.getElementById("condPickBox");
+  if(st.awaitCond && !st.finished && !st.failed){
+    pickBox.style.display = "";
+    document.getElementById("condPickGrid").innerHTML =
+      Object.entries(CONDITIONS).map(([k,cc])=>
+        `<button style="border-color:${cc.color}; color:${cc.color};" onclick="pickCondition('${k}')">${cc.name}</button>`).join("");
+  } else { pickBox.style.display = "none"; }
+
+  // おすすめ / 突貫の結果待ち
+  const rec = pendingRapid ? null : recommend();
+  const recoCard = document.getElementById("recoCard");
+  if(pendingRapid){
+    recoCard.style.display="";
+    document.getElementById("recoAction").textContent = A[pendingRapid].name + "の結果は？";
+    document.getElementById("recoReason").innerHTML =
+      `<div class="rapid-ask">
+        <button style="border:1px solid var(--ok); background:#15301f; color:var(--ok);" onclick="resolveRapid(true)">成功した</button>
+        <button style="border:1px solid var(--good); background:#301515; color:var(--good);" onclick="resolveRapid(false)">失敗した</button>
+      </div>`;
+  } else if(st.awaitCond){
+    recoCard.style.display="";
+    document.getElementById("recoAction").textContent = "状態の入力待ち";
+    document.getElementById("recoReason").textContent = "ゲーム画面に出ている状態変化を上のボタンで選ぶと、次のおすすめを出します";
+  } else if(rec){
+    recoCard.style.display="";
+    document.getElementById("recoAction").textContent = A[rec.id].name;
+    document.getElementById("recoReason").textContent = rec.reason;
+  } else {
+    recoCard.style.display="none";
+  }
+
+  // アクションボタン
+  const groups = {synth:"作業系（工数）", touch:"加工系（品質）", buff:"バフ", misc:"回復・特殊"};
+  let html = "";
+  for(const [g,label] of Object.entries(groups)){
+    html += `<div class="agroup"><h3>${label}</h3><div class="agrid">`;
+    for(const a of ACTIONS.filter(x=>x.group===g)){
+      const usable = canUse(a);
+      const isReco = rec && rec.id===a.id;
+      let costTxt = "";
+      if(usable){
+        const cc = cpCost(a), dd = durCost(a);
+        costTxt = `CP${cc}` + (a.dur>0?` 耐${dd}`:"");
+      } else {
+        costTxt = `CP${a.cp}` + (a.dur>0?` 耐${a.dur}`:"");
+      }
+      let cnt = "";
+      if(a.limited==="co") cnt = `<span class="cnt">残${st.coLeft}</span>`;
+      html += `<button class="abtn ${isReco?"reco-glow":""}" ${usable?"":"disabled"} onclick="doAction('${a.id}')">${cnt}${a.name}<small>${costTxt}</small></button>`;
+    }
+    html += `</div></div>`;
+  }
+  document.getElementById("actionArea").innerHTML = html;
+
+  // 結果
+  const rb = document.getElementById("resultBox");
+  if(st.finished||st.failed){
+    rb.className = "result show " + (st.failed?"fail":"success");
+    rb.innerHTML = st.resultText + `<div class="detail">ターン${st.step} ／ 工数${st.progress.toLocaleString()} ／ 品質${st.quality.toLocaleString()} ／ 残CP${st.cp}<br>「最初から」で再挑戦</div>`;
+  } else {
+    rb.className = "result";
+  }
+
+  // 履歴
+  const hb = document.getElementById("historyBox");
+  if(st.history.length===0){ hb.textContent = "ここに履歴が表示されます"; }
+  else {
+    hb.innerHTML = st.history.map(h=>{
+      const cc = CONDITIONS[h.cond];
+      return `<div>T${h.step} <span class="h-cond" style="color:${cc.color}">[${cc.name}]</span> <span class="h-act">${h.act}</span> <span>${h.detail}</span></div>`;
+    }).join("");
+  }
+  document.getElementById("undoBtn").disabled = undoStack.length===0;
+}
+
+function undo(){
+  if(undoStack.length===0) return;
+  st = undoStack.pop();
+  pendingRapid = null;
+  render();
+}
+function resetCraft(){
+  readSettings();
+  st = newState();
+  undoStack = [];
+  pendingRapid = null;
+  document.getElementById("recPanel").style.display = "none";
+  render();
+}
+function readSettings(){
+  player.craft = +document.getElementById("in-craft").value || 5779;
+  player.control = +document.getElementById("in-control").value || 5502;
+  player.cp = +document.getElementById("in-cp").value || 657;
+  player.foodCp = +document.getElementById("in-foodcp").value || 0;
+  player.potCp = +document.getElementById("in-potcp").value || 0;
+  player.useFood = document.getElementById("in-usefood").checked;
+  player.meister = document.getElementById("in-meister").checked;
+}
+function showPage(p){
+  for(const x of ["sim","guide","set"]){
+    document.getElementById("page-"+x).classList.toggle("active", x===p);
+    document.getElementById("tab-"+x).classList.toggle("active", x===p);
+  }
+}
+
+/* 起動 */
+readSettings();
+st = newState();
+render();
+</script>
+</body>
+</html>
