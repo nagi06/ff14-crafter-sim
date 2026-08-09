@@ -248,7 +248,8 @@
     <tr><td><span class="cond-tag" style="background:#777d8c;color:#fff">不調</span></td><td>品質半減（絶好調の直後に必ず来る）</td><td>加工は撃たない。<b>経過観察</b>で流すか、バフ掛け直し・耐久回復・作業系に充てる</td></tr>
     <tr><td><span class="cond-tag" style="background:#7ec8f0">高進捗</span></td><td>作業系の進捗+50%</td><td>工数を残しているなら<b>下地作業/模範作業</b>で一気に稼ぐ</td></tr>
     <tr><td><span class="cond-tag" style="background:#8de0a8">高能率</span></td><td>CP消費が半分</td><td><b>マニピュレーション/長期倹約/パーフェクトメンド</b>など重いバフをここで撃つ</td></tr>
-    <tr><td><span class="cond-tag" style="background:#6a8ff0;color:#fff">頑強</span></td><td>耐久消費が半分</td><td>耐久10消費の技（<b>精密作業/加工系</b>）を撃つ。倹約加工より素加工が得</td></tr>
+    <tr><td><span class="cond-tag" style="background:#6a8ff0;color:#fff">頑丈</span></td><td>耐久消費が半分</td><td>耐久10消費の技（<b>精密作業/加工系</b>）を撃つ。倹約加工より素加工が得</td></tr>
+    <tr><td><span class="cond-tag" style="background:#3f6ce0;color:#fff">頑強</span></td><td>耐久消費が半分＋次ターンは必ず頑丈</td><td>半減が2ターン確定。<b>下地加工2連打</b>など耐久の重い技を惜しまず撃つ</td></tr>
     <tr><td><span class="cond-tag" style="background:#f0e06a">安定</span></td><td>成功率+25%</td><td>突貫作業を使う構成なら価値大。本構成では通常運用でOK</td></tr>
     <tr><td><span class="cond-tag" style="background:#c98fe8">長持続</span></td><td>このターンに使ったバフ+2ターン</td><td><b>マニピュレーション/イノベーション/ヴェネレーション</b>をここで撃つ</td></tr>
     <tr><td>通常</td><td>-</td><td>倹約加工でIQ積み、または計画通りの手</td></tr>
@@ -265,11 +266,11 @@
   </ul>
   <h2 style="font-size:0.85rem; border:none; padding-left:0;">② 品質フェーズ（IQ10まで積む）</h2>
   <ul>
-    <li>基本は<b>倹約加工</b>（耐久5でIQ+1）。頑強が来たら素の加工系、高品質が来たら<b>集中加工</b>(IQ+2)か<b>秘訣</b></li>
+    <li>基本は<b>倹約加工</b>（耐久5でIQ+1）。頑丈・頑強が来たら素の加工系、高品質が来たら<b>集中加工</b>(IQ+2)か<b>秘訣</b></li>
     <li>耐久管理は<b>マニピュレーション</b>優先。高能率のターンで撃てると理想（96→48CP）</li>
     <li>高品質を1回も引けない時の保険に<b>一心不乱</b>（1回だけ集中加工/秘訣を条件無視で使える）</li>
     <li>IQ10になったら<b>匠の神業</b>（耐久0で品質上げ）とイノベーションを絡めて品質を伸ばす</li>
-    <li>頑強のときは<b>下地加工</b>（200%・IQ+2）が耐久10で撃てて最効率。倹約中・頑強時のIQ積みは<b>加工→洗練加工</b>コンボ（洗練はIQ+2）</li>
+    <li>頑丈・頑強のときは<b>下地加工</b>（200%・IQ+2）が耐久10で撃てて最効率（頑強なら次ターンも頑丈確定で2連打可）。倹約中・頑丈時のIQ積みは<b>加工→洗練加工</b>コンボ（洗練はIQ+2）</li>
     <li>CPが尽きたら<b>ヘイスティタッチ</b>（CP0・成功率60%）がタダで振れるサイコロ。成功直後は<b>デアリングタッチ</b>（CP0・150%・60%）に繋がるので必ず使う</li>
     <li>工数フェーズで耐久が細いときは<b>倹約作業</b>（耐久5・180%）。※<b>匠の早業</b>は高難度レシピでは使用不可（ボタンも常に無効）</li>
   </ul>
@@ -293,7 +294,7 @@
   <ul class="note">
     <li>レシピ: rlvl776 / 除数180・180 / 補正100%（XIVAPI実データ。効率はLv100通常レシピと同じ）</li>
     <li>作業精度5657 → 100%効率あたり進捗316、加工精度5417 → 品質335（設定タブで変更可、食事薬のCPも反映）</li>
-    <li>状態変化の出現率は<b>推定値</b>（高品質12% / 絶好調4% / 高進捗10% / 高能率12% / 頑強15% / 安定10% / 長持続10% / 通常27%、絶好調の翌ターンは必ず不調）。実測と多少ズレる可能性あり。実際にプレイして「高品質がもっと出る」等が分かったら、このファイル内の CONDITIONS の数値を直せば精度が上がる</li>
+    <li>状態変化の出現率は<b>推定値</b>（高品質12% / 絶好調4% / 高進捗10% / 高能率12% / 頑丈11% / 頑強4% / 安定10% / 長持続10% / 通常27%、絶好調の翌ターンは必ず不調、頑強の翌ターンは必ず頑丈）。実測と多少ズレる可能性あり。実際にプレイして「高品質がもっと出る」等が分かったら、このファイル内の CONDITIONS の数値を直せば精度が上がる</li>
     <li>「おすすめ」はあくまで<b>判断の目安</b>。機械的におすすめだけを追った自動テストでは完走成功率は数%だった（惜敗2.9万台が多数）。状態の引きに合わせた人間の判断——特にビエルゴを撃つ/待つの見極め——で上積みするのが本番</li>
   </ul>
 </div>
@@ -332,7 +333,8 @@ const CONDITIONS = {
   poor:      {name:"不調",   color:"#777d8c", p:0,    desc:"品質半減。加工は撃たずバフ・回復・作業系で流す"},
   malleable: {name:"高進捗", color:"#7ec8f0", p:0.10, desc:"進捗1.5倍 ／ 作業系を撃つチャンス"},
   pliant:    {name:"高能率", color:"#8de0a8", p:0.12, desc:"CP消費が半分 ／ 重いバフを撃つチャンス"},
-  sturdy:    {name:"頑強",   color:"#6a8ff0", p:0.15, desc:"耐久消費が半分 ／ 耐久10の技を撃つチャンス"},
+  sturdy:    {name:"頑丈",   color:"#6a8ff0", p:0.11, desc:"耐久消費が半分 ／ 耐久10の技を撃つチャンス"},
+  robust:    {name:"頑強",   color:"#3f6ce0", p:0.04, desc:"耐久消費が半分＋次ターンは必ず頑丈（半減2連チャンス）"},
   centered:  {name:"安定",   color:"#f0e06a", p:0.10, desc:"成功率+25%（突貫作業などに影響）"},
   primed:    {name:"長持続", color:"#c98fe8", p:0.10, desc:"このターンに使ったバフの持続+2"},
 };
@@ -454,7 +456,9 @@ function rollCondition(){
   return "normal";
 }
 function nextCondition(cur){
-  return cur==="excellent" ? "poor" : rollCondition(); // 絶好調の直後は必ず不調
+  if(cur==="excellent") return "poor";   // 絶好調の直後は必ず不調
+  if(cur==="robust") return "sturdy";    // 頑強の直後は必ず頑丈
+  return rollCondition();
 }
 
 /* ========= 使用可否 ========= */
@@ -490,7 +494,7 @@ function durCost(a){
   if(d===0) return 0;
   if(st.tpReady) return 0;
   if(st.buffs.wasteNot>0) d = d/2;
-  if(st.condition==="sturdy") d = d/2;
+  if(st.condition==="sturdy"||st.condition==="robust") d = d/2;
   return Math.ceil(d);
 }
 
@@ -677,6 +681,7 @@ function endStep(a){
   st.lastAction = a.id;
   st.step++;
   if(st.condition==="excellent"){ st.condition = "poor"; } // 絶好調の直後は必ず不調
+  else if(st.condition==="robust"){ st.condition = "sturdy"; } // 頑強の直後は必ず頑丈
   else if(followMode){ st.awaitCond = true; }
   else { st.condition = rollCondition(); }
 }
@@ -846,11 +851,13 @@ function recommendCore(){
     if(st.cp>=112+30) return r("immaculateMend","パーフェクトメンドで耐久全回復");
     if(st.cp>=88+30) return r("mastersMend","マスターズメンドで耐久回復");
   }
-  // 頑強: 耐久10の技が半額
-  if(cond==="sturdy" && st.iq<10 && st.buffs.wasteNot<=0 && st.durability>5){
+  // 頑丈/頑強: 耐久10の技が半額（頑強なら次ターンも頑丈確定）
+  if((cond==="sturdy"||cond==="robust") && st.iq<10 && st.buffs.wasteNot<=0 && st.durability>5){
     if(st.iq<=8 && st.cp>=cpCost(A.preparatoryTouch) && st.durability>durCost(A.preparatoryTouch))
-      return r("preparatoryTouch","頑強なら下地加工が耐久10で効率200%＋IQ+2。一番おいしい使い方");
-    return r(st.lastAction==="basicTouch"?"refinedTouch":"basicTouch","頑強は耐久10の技が5で済む。加工→洗練加工コンボでIQを積む(洗練はIQ+2)");
+      return r("preparatoryTouch", cond==="robust"
+        ? "頑強は次ターンも頑丈確定。下地加工（耐久10で200%＋IQ+2）を2連打できる大チャンス"
+        : "頑丈なら下地加工が耐久10で効率200%＋IQ+2。一番おいしい使い方");
+    return r(st.lastAction==="basicTouch"?"refinedTouch":"basicTouch","頑丈は耐久10の技が5で済む。加工→洗練加工コンボでIQを積む(洗練はIQ+2)");
   }
   // 長持続: バフを伸ばす
   if(cond==="primed"){
