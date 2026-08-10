@@ -47,7 +47,8 @@
 <body>
 <h1>クラフターマクロメーカー</h1>
 <p class="lead">コスモミッションなど「工数・品質・耐久が毎回違う」レシピ用に、
-最終確認で工数を止めてから品質を積む2段マクロを自動生成します。
+<b>品質を先に積みきってから工数を仕上げる</b>マクロを自動生成します。
+レシピが見積りより簡単でも「早めに完成する」方向にしか転ばない安全設計。
 ルインド・アクアダクト中間素材（★5）は手打ち推奨なので<a href="../">シミュレーター</a>へ。</p>
 
 <h2>レシピ（製作手帳の数値）</h2>
@@ -81,7 +82,7 @@
 
 <div id="out"></div>
 
-<p class="note">・マクロは「工数を最終確認で1残しに固定 → 品質をIQ＋イノベ＋ビエルゴで積む → 素の作業で完成」の型です<br>
+<p class="note">・マクロは「真価→倹約加工でIQ積み→グレスト＋ビエルゴで品質完成 → ヴェネ＋作業系で工数を上げて完成」の型です<br>
 ・進捗/品質の見積もりは控えめ（rlvl776基準）。実レシピが簡単な分には早めに完成して残りが空振りするだけで無害<br>
 ・品質やCPが届かない場合は生成時に警告が出ます（食事・薬や装備更新を検討）<br>
 ・Final Fantasy XIV © SQUARE ENIX CO., LTD. 非公式ファンメイドツール</p>
@@ -145,43 +146,23 @@ function buildPlan(cfg){
     basic:()=>({n:"作業", w:3, dur:10, cp:0, pGain:Math.floor(p100*1.2)}),
   };
 
-  // ---- 工数フェーズ ----
-  let cum = 0, veneLeft = 0;
-  const mmGain = Math.floor(p100*3);
-  if(mmGain >= prog){
-    seq.push(A.fa()); seq.push(A.mm()); cum = mmGain;
-  } else {
-    seq.push(A.mm()); cum = mmGain;
-    seq.push(A.vene()); veneLeft = 4;
-    const gw = A.gw(2.5); seq.push(gw); cum += gw.pGain; veneLeft--; // 確信バフ+ヴェネ
-    let guard = 0;
-    while(cum < prog && guard++ < 30){
-      if(veneLeft <= 0){ seq.push(A.vene()); veneLeft = 4; }
-      const s = A.ps(1.5); seq.push(s); cum += s.pGain; veneLeft--;
-    }
-    // 完成させてしまう1手の直前に最終確認を挿入
-    let run = 0;
-    for(let i=0;i<seq.length;i++){
-      if(!seq[i].pGain) continue;
-      run += seq[i].pGain;
-      if(run >= prog){ seq.splice(i,0,A.fa()); break; }
-    }
-  }
-
-  // ---- 品質フェーズ（品質目標がある場合のみ）----
+  // ---- 品質フェーズを先に（工数がいつ満タンになっても品質が入っているように）----
+  // レシピが見積りより簡単な場合、工数フェーズの途中で早めに完成するだけで事故らない
   let iq = 0, tq = 0, nTouch = 0;
   const byG = k=>Math.floor(q100*(1+0.2*Math.min(k,10))*(1+Math.min(k,10)/10)*2.5);
   if(qual > 0){
-    // 必要タッチ数を先に決める
+    const refl = {n:"真価", w:3, dur:10, cp:6, qGain:Math.floor(q100*3)};
+    seq.push(refl); tq = refl.qGain; iq = 2;
+    // 必要タッチ数を先に決める（真価でIQ2スタート）
     while(nTouch < 16){
+      if(tq + byG(iq) >= qual) break;
       tq += Math.floor(q100*(1+0.1*Math.min(iq,10))*1.5);
       if(iq<10) iq++;
       nTouch++;
-      if(tq + byG(iq) >= qual) break;
     }
     // 実シーケンス化
     seq.push(A.manip());
-    let innovLeft = 0, placed = 0, iq2 = 0;
+    let innovLeft = 0, placed = 0, iq2 = 2;
     const half = cfg.manip2 ? Math.ceil(nTouch/2) : -1;
     while(placed < nTouch){
       if(placed === half) seq.push(A.manip());
@@ -192,7 +173,23 @@ function buildPlan(cfg){
     seq.push(A.gs()); innovLeft--;
     seq.push(A.by(iq2));
   }
-  seq.push(A.basic());
+
+  // ---- 工数フェーズ（最後。満タンに達した手で完成する）----
+  let cum = 0, veneLeft = 0;
+  const mmGain = Math.floor(p100*3);
+  if(qual <= 0){
+    seq.push(A.mm()); cum = mmGain; // 品質不要なら確信スタートで最速
+  }
+  if(cum < prog){
+    seq.push(A.vene()); veneLeft = 4;
+    const gw = A.gw(qual<=0 ? 2.5 : 1.5); // 確信バフは品質不要ルートのみ
+    seq.push(gw); cum += gw.pGain; veneLeft--;
+    let guard = 0;
+    while(cum < prog && guard++ < 30){
+      if(veneLeft <= 0){ seq.push(A.vene()); veneLeft = 4; }
+      const s = A.ps(1.5); seq.push(s); cum += s.pGain; veneLeft--;
+    }
+  }
 
   // ---- シミュレーション（耐久・CP検証）----
   let d = dur, cpUse = 0, manipLeft = 0, durOk = true, pTotal = 0, qTotal = 0;
@@ -210,8 +207,7 @@ function buildPlan(cfg){
     if(a.buff === "manip"){ manipLeft = 8; continue; }
     if(manipLeft > 0){ d = Math.min(dur, d+5); manipLeft--; }
   }
-  pTotal = Math.min(pTotal, prog-1) + Math.floor(p100*1.2); // 最終確認込みの実効
-  return {seq, durOk, cpUse, pTotal, qTotal: tq + byG(iq), nTouch, durLeft: d};
+  return {seq, durOk, cpUse, pTotal, progOk: pTotal >= prog, qTotal: tq + byG(iq), nTouch, durLeft: d};
 }
 
 function render(r, cfg){
@@ -220,7 +216,7 @@ function render(r, cfg){
   const qualOk = cfg.qual <= 0 || r.qTotal >= cfg.qual;
   const cpOk = r.cpUse <= cfg.cp;
   html += `<div class="summary-box">
-    進捗見込 <b>${r.pTotal.toLocaleString()}</b> / ${cfg.prog.toLocaleString()}（最終確認で1残し固定→最後に完成）<br>
+    進捗見込 <b>${r.pTotal.toLocaleString()}</b> / ${cfg.prog.toLocaleString()}（品質を先に積むので、工数が早く満タンになっても安全）<br>
     品質見込 <b>${r.qTotal.toLocaleString()}</b> / ${(cfg.qual||0).toLocaleString()}（タッチ${r.nTouch}回＋ビエルゴ）<br>
     CP消費 <b>${r.cpUse}</b> / ${cfg.cp} ／ 耐久余裕 ${Math.max(0,r.durLeft)}<br>
     <span style="color:var(--sub)">前提: 進捗${cfg.p100}/品質${cfg.q100}（100%あたり・控えめ見積り）</span>
@@ -228,6 +224,7 @@ function render(r, cfg){
   if(!qualOk) html += `<p class="warnmsg">⚠ 品質が目標に届かない見積りです。食事・薬でステータスを盛るか、実レシピが簡単なことを祈って回してください（上級設定で実測値を入れると正確になります）</p>`;
   if(!cpOk) html += `<p class="badmsg">✖ CPが${r.cpUse - cfg.cp}足りません。食事・薬を使うか、品質目標を下げてください</p>`;
   if(!r.durOk) html += `<p class="badmsg">✖ 耐久が持ちません。このレシピは自動生成の型では厳しいので手打ち推奨です</p>`;
+  if(!r.progOk) html += `<p class="warnmsg">⚠ 見積り上、工数が僅かに届かない可能性があります。マクロが終わって未完成なら「作業」を1〜2回手で押してください（製作は失敗しません）</p>`;
 
   // マクロ分割（echo込み15行以内）
   const lines = r.seq.map(a => `/ac ${a.n} <wait.${a.w}>`);
