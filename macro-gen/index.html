@@ -134,9 +134,10 @@ function generate(){
     for(let tr = 0; tr <= 8; tr++)
       for(const manip2 of [false, true])
         tryOrder.push({template:"q", touchCap: 16 - tr, manip2, qMargin});
-    for(let mm = 2; mm <= 4; mm++)
-      for(let tr = 0; tr <= 8; tr++)
-        tryOrder.push({template:"p", touchCap: 16 - tr, maxManips: mm, qMargin});
+    for(const earlyQuality of [false, true])
+      for(let mm = 2; mm <= 4; mm++)
+        for(let tr = 0; tr <= 8; tr++)
+          tryOrder.push({template:"p", touchCap: 16 - tr, maxManips: mm, qMargin, earlyQuality});
   }
   let result = null;
   for(const opt of tryOrder){
@@ -179,49 +180,57 @@ function buildPlan(cfg){
   };
 
   if(cfg.template === "p" && qual > 0){
-    // ==== 工数先行型（工数が重く品質が軽いレシピ用）====
-    // 確信→工数を推定7割まで→品質→匠の絶技+下地→残り工数。
-    // 工数フェーズ中もマニピュレーションを定期的に張り直して耐久を維持する
+    // ==== 工数先行型（工数が重い/耐久が細いレシピ用）====
+    // 通常: 確信→工数7割→品質→絶技+下地→残り工数
+    // earlyQuality（低耐久向け）: 確信→品質を先に済ませ→絶技+下地→残り工数（下地を生耐久で撃たない）
     let manipsLeft = (cfg.maxManips||2), sinceManip = 99, veneLeft = 0, guard = 0;
     let cum = 0;
     const needManip = ()=>{ if(sinceManip >= 7 && manipsLeft > 0){ seq.push(A.manip()); manipsLeft--; sinceManip = 0; veneLeft--; return true; } return false; }; // マニピュ再張りもヴェネの残りターンを1消費する
+    const synthTail = (target)=>{
+      guard = 0;
+      while(cum < target && guard++ < 40){
+        if(needManip()) continue;
+        if(veneLeft <= 0){ seq.push(A.vene()); veneLeft = 4; sinceManip++; }
+        const s = A.ps(1.5); seq.push(s); cum += s.pGain; veneLeft--; sinceManip++;
+      }
+    };
+    const qualityBlock = ()=>{
+      // 品質（真価なし・IQ0から）。GSは届かないときだけ使う
+      let iqSim = 0;
+      while(nTouch < cap){
+        if(tq + byGnoGS(iqSim) >= qTarget) break;
+        tq += touchGain(iqSim); if(iqSim<10) iqSim++; nTouch++;
+      }
+      const useGS = tq + byGnoGS(iqSim) < qTarget;
+      let innovLeft = 0, placed = 0, iq2 = 0;
+      while(placed < nTouch){
+        if(innovLeft <= 0){ seq.push(A.innov()); innovLeft = 4; sinceManip++; }
+        pushTouch(iq2); if(iq2<10) iq2++; placed++; innovLeft--; sinceManip++;
+      }
+      if(innovLeft < (useGS?2:1)){ seq.push(A.innov()); innovLeft = 4; sinceManip++; }
+      if(useGS){ seq.push(A.gs()); innovLeft--; sinceManip++; }
+      const by = A.by(iq2); if(!useGS) by.qGain = byGnoGS(iq2);
+      seq.push(by); sinceManip++;
+      iq = iqSim;
+    };
+    const finalProgress = ()=>{
+      seq.push({n:"匠の絶技", w:3, dur:0, cp:0});
+      needManip();
+      seq.push(A.vene()); veneLeft = 4; sinceManip++;
+      const gw = A.gw(1.5); gw.dur = 0; seq.push(gw); cum += gw.pGain; veneLeft--; sinceManip++;
+      synthTail(prog);
+    };
     seq.push(A.mm()); cum = Math.floor(p100*3);
     needManip();
-    seq.push(A.vene()); veneLeft = 4; sinceManip++;
-    const gw1 = A.gw(2.5); seq.push(gw1); cum += gw1.pGain; veneLeft--; sinceManip++;
-    const stopAt = Math.floor(prog*0.72); // 実レシピが簡単でも途中完成しない安全マージン
-    while(cum < stopAt && guard++ < 40){
-      if(needManip()) continue;
-      if(veneLeft <= 0){ seq.push(A.vene()); veneLeft = 4; sinceManip++; }
-      const s = A.ps(1.5); seq.push(s); cum += s.pGain; veneLeft--; sinceManip++;
-    }
-    // 品質（真価なし・IQ0から）。GSは届かないときだけ使う
-    let iqSim = 0;
-    while(nTouch < cap){
-      if(tq + byGnoGS(iqSim) >= qTarget) break;
-      tq += touchGain(iqSim); if(iqSim<10) iqSim++; nTouch++;
-    }
-    const useGS = tq + byGnoGS(iqSim) < qTarget;
-    let innovLeft = 0, placed = 0, iq2 = 0;
-    while(placed < nTouch){
-      if(innovLeft <= 0){ seq.push(A.innov()); innovLeft = 4; sinceManip++; }
-      pushTouch(iq2); if(iq2<10) iq2++; placed++; innovLeft--; sinceManip++;
-    }
-    if(innovLeft < (useGS?2:1)){ seq.push(A.innov()); innovLeft = 4; sinceManip++; }
-    if(useGS){ seq.push(A.gs()); innovLeft--; sinceManip++; }
-    const by = A.by(iq2); if(!useGS) by.qGain = byGnoGS(iq2);
-    seq.push(by); sinceManip++;
-    iq = iqSim;
-    // 残りの工数
-    seq.push({n:"匠の絶技", w:2, dur:0, cp:0});
-    needManip();
-    seq.push(A.vene()); veneLeft = 4; sinceManip++;
-    const gw2 = A.gw(1.5); gw2.dur = 0; seq.push(gw2); cum += gw2.pGain; veneLeft--; sinceManip++;
-    guard = 0;
-    while(cum < prog && guard++ < 40){
-      if(needManip()) continue;
-      if(veneLeft <= 0){ seq.push(A.vene()); veneLeft = 4; sinceManip++; }
-      const s = A.ps(1.5); seq.push(s); cum += s.pGain; veneLeft--; sinceManip++;
+    if(cfg.earlyQuality){
+      qualityBlock();
+      finalProgress();
+    } else {
+      seq.push(A.vene()); veneLeft = 4; sinceManip++;
+      const gw1 = A.gw(2.5); seq.push(gw1); cum += gw1.pGain; veneLeft--; sinceManip++;
+      synthTail(Math.floor(prog*0.72)); // 実レシピが簡単でも途中完成しない安全マージン
+      qualityBlock();
+      finalProgress();
     }
   } else {
   // ==== 品質先積み型（既定。品質重視のレシピ用）====
