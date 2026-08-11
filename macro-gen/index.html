@@ -175,7 +175,7 @@ function buildPlan(cfg){
     // 工数フェーズ中もマニピュレーションを定期的に張り直して耐久を維持する
     let manipsLeft = (cfg.maxManips||2), sinceManip = 99, veneLeft = 0, guard = 0;
     let cum = 0;
-    const needManip = ()=>{ if(sinceManip >= 7 && manipsLeft > 0){ seq.push(A.manip()); manipsLeft--; sinceManip = 0; return true; } return false; };
+    const needManip = ()=>{ if(sinceManip >= 7 && manipsLeft > 0){ seq.push(A.manip()); manipsLeft--; sinceManip = 0; veneLeft--; return true; } return false; }; // マニピュ再張りもヴェネの残りターンを1消費する
     seq.push(A.mm()); cum = Math.floor(p100*3);
     needManip();
     seq.push(A.vene()); veneLeft = 4; sinceManip++;
