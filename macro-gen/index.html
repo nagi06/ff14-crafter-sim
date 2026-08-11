@@ -56,6 +56,7 @@
   <div class="field"><label>工数</label><input type="number" id="in-prog" value="4500"></div>
   <div class="field"><label>品質（目標）</label><input type="number" id="in-qual" value="10500"></div>
   <div class="field"><label>耐久</label><input type="number" id="in-dur" value="80"></div>
+  <div class="field"><label>初期品質<span class="hint">HQ素材持ち込み時に製作手帳に出る値。なければ0</span></label><input type="number" id="in-init" value="0"></div>
 </div>
 
 <h2>自分のステータス（食事込みの実数値）</h2>
@@ -93,7 +94,7 @@
 "use strict";
 const WAIT = {act:3, buff:2};
 // 入力値の保存・復元（ステータスはコスモツールの強化段階で変わるので前回値を記憶）
-const FIELDS = ["in-prog","in-qual","in-dur","in-craft","in-control","in-cp","in-p100","in-q100"];
+const FIELDS = ["in-prog","in-qual","in-dur","in-init","in-craft","in-control","in-cp","in-p100","in-q100"];
 function saveInputs(){
   const o = {};
   for(const id of FIELDS) o[id] = document.getElementById(id).value;
@@ -108,7 +109,9 @@ function saveInputs(){
 // name, 種別(step消費/耐久/CP), gain計算はプランナー側で
 function generate(){
   const prog = +document.getElementById("in-prog").value||0;
-  const qual = +document.getElementById("in-qual").value||0;
+  const qualTarget = +document.getElementById("in-qual").value||0;
+  const init = Math.max(0, +document.getElementById("in-init").value||0);
+  const qual = Math.max(0, qualTarget - init); // マクロで積むべき残り品質
   const dur  = +document.getElementById("in-dur").value||0;
   const craft= +document.getElementById("in-craft").value||0;
   const ctrl = +document.getElementById("in-control").value||0;
@@ -141,7 +144,7 @@ function generate(){
     if(!result) result = r;
     if(r.durOk && r.cpUse <= cp){ result = r; break; }
   }
-  render(result, {prog, qual, dur, cp, p100, q100});
+  render(result, {prog, qual: qualTarget, init, dur, cp, p100, q100});
 }
 
 function buildPlan(cfg){
@@ -304,11 +307,11 @@ function buildPlan(cfg){
 function render(r, cfg){
   const out = document.getElementById("out");
   let html = "";
-  const qualOk = cfg.qual <= 0 || r.qTotal >= cfg.qual;
+  const qualOk = cfg.qual <= 0 || (cfg.init + r.qTotal) >= cfg.qual;
   const cpOk = r.cpUse <= cfg.cp;
   html += `<div class="summary-box">
     進捗見込 <b>${r.pTotal.toLocaleString()}</b> / ${cfg.prog.toLocaleString()}（品質を先に積むので、工数が早く満タンになっても安全）<br>
-    品質見込 <b>${r.qTotal.toLocaleString()}</b> / ${(cfg.qual||0).toLocaleString()}（タッチ${r.nTouch}回＋ビエルゴ）<br>
+    品質見込 <b>${(cfg.init + r.qTotal).toLocaleString()}</b> / ${(cfg.qual||0).toLocaleString()}（${cfg.init>0?`初期品質${cfg.init.toLocaleString()}＋`:""}タッチ${r.nTouch}回＋ビエルゴ）<br>
     CP消費 <b>${r.cpUse}</b> / ${cfg.cp} ／ 耐久余裕 ${Math.max(0,r.durLeft)}<br>
     <span style="color:var(--sub)">前提: 進捗${cfg.p100}/品質${cfg.q100}（100%あたり・控えめ見積り）</span>
   </div>`;
