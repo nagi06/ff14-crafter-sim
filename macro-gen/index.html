@@ -120,12 +120,17 @@ function generate(){
   if(!prog||!dur||!craft){ out.innerHTML = '<p class="badmsg">工数・耐久・作業精度は必須です</p>'; return; }
   saveInputs();
 
-  // ---- プラン構築（manip2: 耐久が足りないとき2本目のマニピュを入れるリトライ用）----
+  // ---- プラン構築 ----
+  // 優先順位: ①完走できる ②耐久黒字（製作失敗しない） ③CP内 ④品質目標
+  // CPが足りなければタッチを減らして品質を妥協し、完走と失敗回避を死守する
   let result = null;
-  for(const manip2 of [false, true]){
-    const r = buildPlan({prog, qual, dur, cp, p100, q100, manip2});
-    if(r.durOk){ result = r; break; }
-    result = r; // 両方ダメでも最後の結果を表示
+  outer:
+  for(let touchReduce = 0; touchReduce <= 8; touchReduce++){
+    for(const manip2 of [false, true]){
+      const r = buildPlan({prog, qual, dur, cp, p100, q100, manip2, touchCap: 16 - touchReduce});
+      if(!result) result = r;
+      if(r.durOk && r.cpUse <= cp){ result = r; break outer; }
+    }
   }
   render(result, {prog, qual, dur, cp, p100, q100});
 }
@@ -155,8 +160,9 @@ function buildPlan(cfg){
   if(qual > 0){
     const refl = {n:"真価", w:3, dur:10, cp:6, qGain:Math.floor(q100*3)};
     seq.push(refl); tq = refl.qGain; iq = 2;
-    // 必要タッチ数を先に決める（真価でIQ2スタート）
-    while(nTouch < 16){
+    // 必要タッチ数を先に決める（真価でIQ2スタート、touchCapで品質妥協が可能）
+    const cap = cfg.touchCap != null ? cfg.touchCap : 16;
+    while(nTouch < cap){
       if(tq + byG(iq) >= qual) break;
       tq += Math.floor(q100*(1+0.1*Math.min(iq,10))*1.5);
       if(iq<10) iq++;
@@ -169,7 +175,9 @@ function buildPlan(cfg){
     while(placed < nTouch){
       if(placed === half) seq.push(A.manip());
       if(innovLeft <= 0){ seq.push(A.innov()); innovLeft = 4; }
-      seq.push(A.pt(iq2)); if(iq2<10) iq2++; placed++; innovLeft--;
+      const t = A.pt(iq2);
+      if(iq2 >= 10){ t.n = "匠の神業"; t.dur = 0; t.cp = 32; } // IQ10以降は耐久消費なしの神業
+      seq.push(t); if(iq2<10) iq2++; placed++; innovLeft--;
     }
     if(innovLeft < 2){ seq.push(A.innov()); innovLeft = 4; }
     seq.push(A.gs()); innovLeft--;
@@ -203,10 +211,10 @@ function buildPlan(cfg){
       cpUse += a.cp;
       if(a.pGain) pTotal += a.pGain;
       if(a.qGain) qTotal += a.qGain;
-      const isLast = (i === seq.length-1);
+      // 完成前提にしない: マクロが最後まで走っても耐久が尽きない（=製作失敗が起きない）ことを要求
       if(a.dur > 0){
         d -= a.dur;
-        if(d <= 0 && !isLast){ durOk = false; }
+        if(d <= 0){ durOk = false; }
       }
       if(a.noStep) continue;
       if(a.buff === "manip"){ manipLeft = 8; continue; }
@@ -242,8 +250,8 @@ function render(r, cfg){
   </div>`;
   if(!qualOk) html += `<p class="warnmsg">⚠ 品質が目標に届かない見積りです。食事・薬でステータスを盛るか、実レシピが簡単なことを祈って回してください（上級設定で実測値を入れると正確になります）</p>`;
   if(!cpOk) html += `<p class="badmsg">✖ CPが${r.cpUse - cfg.cp}足りません。食事・薬を使うか、品質目標を下げてください</p>`;
-  if(!r.durOk) html += `<p class="badmsg">✖ 耐久が持ちません。このレシピは自動生成の型では厳しいので手打ち推奨です</p>`;
-  if(!r.progOk) html += `<p class="warnmsg">⚠ 見積り上、工数が僅かに届かない可能性があります。マクロが終わって未完成なら「作業」を1〜2回手で押してください（製作は失敗しません）</p>`;
+  if(!r.durOk) html += `<p class="badmsg">✖ 耐久を黒字にできませんでした（CP不足で節約手が使えない等）。薬でCPを増やすか、1ランク下のミッションを推奨</p>`;
+  if(r.durOk && qualOk && cpOk) html += `<p style="color:var(--ok);font-size:0.75rem;line-height:1.7;margin-top:8px;">✔ 製作失敗しない設計です: マクロが最後まで走っても耐久が${Math.max(0,r.durLeft)}残ります。万一未完成で終わったら「作業」を手で1〜2回押せば完成（品質は積み終わっているので評価は落ちません）</p>`;
 
   // マクロ分割（echo込み15行以内）
   const lines = r.seq.map(a => `/ac ${a.n} <wait.${a.w}>`);
