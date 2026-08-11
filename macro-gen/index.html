@@ -122,15 +122,20 @@ function generate(){
 
   // ---- プラン構築 ----
   // 優先順位: ①完走できる ②耐久黒字（製作失敗しない） ③CP内 ④品質目標
+  // テンプレは2種: q=品質先積み型（品質重視レシピ向け） / p=工数先行型（工数の重いレシピ向け）
   // CPが足りなければタッチを減らして品質を妥協し、完走と失敗回避を死守する
+  const tryOrder = [];
+  for(let tr = 0; tr <= 8; tr++)
+    for(const manip2 of [false, true])
+      tryOrder.push({template:"q", touchCap: 16 - tr, manip2});
+  for(let mm = 2; mm <= 4; mm++)
+    for(let tr = 0; tr <= 8; tr++)
+      tryOrder.push({template:"p", touchCap: 16 - tr, maxManips: mm});
   let result = null;
-  outer:
-  for(let touchReduce = 0; touchReduce <= 8; touchReduce++){
-    for(const manip2 of [false, true]){
-      const r = buildPlan({prog, qual, dur, cp, p100, q100, manip2, touchCap: 16 - touchReduce});
-      if(!result) result = r;
-      if(r.durOk && r.cpUse <= cp){ result = r; break outer; }
-    }
+  for(const opt of tryOrder){
+    const r = buildPlan(Object.assign({prog, qual, dur, cp, p100, q100}, opt));
+    if(!result) result = r;
+    if(r.durOk && r.cpUse <= cp){ result = r; break; }
   }
   render(result, {prog, qual, dur, cp, p100, q100});
 }
@@ -153,18 +158,72 @@ function buildPlan(cfg){
     basic:()=>({n:"作業", w:3, dur:10, cp:0, pGain:Math.floor(p100*1.2)}),
   };
 
-  // ---- 品質フェーズを先に（工数がいつ満タンになっても品質が入っているように）----
-  // レシピが見積りより簡単な場合、工数フェーズの途中で早めに完成するだけで事故らない
+  const cap = cfg.touchCap != null ? cfg.touchCap : 16;
   let iq = 0, tq = 0, nTouch = 0;
-  const byG = k=>Math.floor(q100*(1+0.2*Math.min(k,10))*(1+Math.min(k,10)/10)*2.5);
+  const touchGain = k=>Math.floor(q100*(1+0.1*Math.min(k,10))*1.5);
+  const byG     = k=>Math.floor(q100*(1+0.2*Math.min(k,10))*(1+Math.min(k,10)/10)*2.5); // イノベ+GS
+  const byGnoGS = k=>Math.floor(q100*(1+0.2*Math.min(k,10))*(1+Math.min(k,10)/10)*1.5); // イノベのみ
+  const pushTouch = (iqNow)=>{
+    const t = A.pt(iqNow);
+    if(iqNow >= 10){ t.n = "匠の神業"; t.dur = 0; t.cp = 32; } // IQ10以降は耐久消費なしの神業
+    seq.push(t);
+  };
+
+  if(cfg.template === "p" && qual > 0){
+    // ==== 工数先行型（工数が重く品質が軽いレシピ用）====
+    // 確信→工数を推定7割まで→品質→匠の絶技+下地→残り工数。
+    // 工数フェーズ中もマニピュレーションを定期的に張り直して耐久を維持する
+    let manipsLeft = (cfg.maxManips||2), sinceManip = 99, veneLeft = 0, guard = 0;
+    let cum = 0;
+    const needManip = ()=>{ if(sinceManip >= 7 && manipsLeft > 0){ seq.push(A.manip()); manipsLeft--; sinceManip = 0; return true; } return false; };
+    seq.push(A.mm()); cum = Math.floor(p100*3);
+    needManip();
+    seq.push(A.vene()); veneLeft = 4; sinceManip++;
+    const gw1 = A.gw(2.5); seq.push(gw1); cum += gw1.pGain; veneLeft--; sinceManip++;
+    const stopAt = Math.floor(prog*0.72); // 実レシピが簡単でも途中完成しない安全マージン
+    while(cum < stopAt && guard++ < 40){
+      if(needManip()) continue;
+      if(veneLeft <= 0){ seq.push(A.vene()); veneLeft = 4; sinceManip++; }
+      const s = A.ps(1.5); seq.push(s); cum += s.pGain; veneLeft--; sinceManip++;
+    }
+    // 品質（真価なし・IQ0から）。GSは届かないときだけ使う
+    let iqSim = 0;
+    while(nTouch < cap){
+      if(tq + byGnoGS(iqSim) >= qual) break;
+      tq += touchGain(iqSim); if(iqSim<10) iqSim++; nTouch++;
+    }
+    const useGS = tq + byGnoGS(iqSim) < qual;
+    let innovLeft = 0, placed = 0, iq2 = 0;
+    while(placed < nTouch){
+      if(innovLeft <= 0){ seq.push(A.innov()); innovLeft = 4; sinceManip++; }
+      pushTouch(iq2); if(iq2<10) iq2++; placed++; innovLeft--; sinceManip++;
+    }
+    if(innovLeft < (useGS?2:1)){ seq.push(A.innov()); innovLeft = 4; sinceManip++; }
+    if(useGS){ seq.push(A.gs()); innovLeft--; sinceManip++; }
+    const by = A.by(iq2); if(!useGS) by.qGain = byGnoGS(iq2);
+    seq.push(by); sinceManip++;
+    iq = iqSim;
+    // 残りの工数
+    seq.push({n:"匠の絶技", w:2, dur:0, cp:0});
+    needManip();
+    seq.push(A.vene()); veneLeft = 4; sinceManip++;
+    const gw2 = A.gw(1.5); gw2.dur = 0; seq.push(gw2); cum += gw2.pGain; veneLeft--; sinceManip++;
+    guard = 0;
+    while(cum < prog && guard++ < 40){
+      if(needManip()) continue;
+      if(veneLeft <= 0){ seq.push(A.vene()); veneLeft = 4; sinceManip++; }
+      const s = A.ps(1.5); seq.push(s); cum += s.pGain; veneLeft--; sinceManip++;
+    }
+  } else {
+  // ==== 品質先積み型（既定。品質重視のレシピ用）====
+  // レシピが見積りより簡単な場合、工数フェーズの途中で早めに完成するだけで事故らない
   if(qual > 0){
     const refl = {n:"真価", w:3, dur:10, cp:6, qGain:Math.floor(q100*3)};
     seq.push(refl); tq = refl.qGain; iq = 2;
     // 必要タッチ数を先に決める（真価でIQ2スタート、touchCapで品質妥協が可能）
-    const cap = cfg.touchCap != null ? cfg.touchCap : 16;
     while(nTouch < cap){
       if(tq + byG(iq) >= qual) break;
-      tq += Math.floor(q100*(1+0.1*Math.min(iq,10))*1.5);
+      tq += touchGain(iq);
       if(iq<10) iq++;
       nTouch++;
     }
@@ -175,16 +234,14 @@ function buildPlan(cfg){
     while(placed < nTouch){
       if(placed === half) seq.push(A.manip());
       if(innovLeft <= 0){ seq.push(A.innov()); innovLeft = 4; }
-      const t = A.pt(iq2);
-      if(iq2 >= 10){ t.n = "匠の神業"; t.dur = 0; t.cp = 32; } // IQ10以降は耐久消費なしの神業
-      seq.push(t); if(iq2<10) iq2++; placed++; innovLeft--;
+      pushTouch(iq2); if(iq2<10) iq2++; placed++; innovLeft--;
     }
     if(innovLeft < 2){ seq.push(A.innov()); innovLeft = 4; }
     seq.push(A.gs()); innovLeft--;
     seq.push(A.by(iq2));
   }
 
-  // ---- 工数フェーズ（最後。満タンに達した手で完成する）----
+  // 工数フェーズ（最後。満タンに達した手で完成する）
   let cum = 0, veneLeft = 0;
   const mmGain = Math.floor(p100*3);
   if(qual <= 0){
@@ -201,6 +258,7 @@ function buildPlan(cfg){
       if(veneLeft <= 0){ seq.push(A.vene()); veneLeft = 4; }
       const s = A.ps(1.5); seq.push(s); cum += s.pGain; veneLeft--;
     }
+  }
   }
 
   // ---- シミュレーション（耐久・CP検証）----
@@ -234,7 +292,7 @@ function buildPlan(cfg){
     sim = s2;
   }
   return {seq, durOk: sim.durOk, cpUse: sim.cpUse, pTotal: sim.pTotal, progOk: sim.pTotal >= prog,
-          qTotal: tq + byG(iq), nTouch, durLeft: sim.d};
+          qTotal: sim.qTotal, nTouch, durLeft: sim.d};
 }
 
 function render(r, cfg){
