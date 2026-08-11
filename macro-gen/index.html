@@ -70,8 +70,9 @@
 <details>
 <summary>精度が合わないとき（上級設定）</summary>
 <p style="margin-top:6px;">レシピの難度によって100%効率あたりの進捗・品質は変わります。
-初期値は★5レシピ相当の控えめな見積もりなので、実際より低めに出る（＝マクロが長めになる）ことはあっても足りなくなりにくい設計です。
-一度製作して<b>確信で出た進捗値</b>がわかるなら、÷3した値を下に入れると正確になります。</p>
+初期値は安全側の見積もりですが、一度製作したログがあれば実測値を入れると正確になります:<br>
+・進捗/100% = <b>ヴェネ付き下地作業で進んだ量 ÷ 5.4</b>（例: 1198→222）<br>
+・品質/100% = <b>真価で上がった品質 ÷ 3</b>（例: 792→264）</p>
 <div class="grid">
   <div class="field"><label>進捗/100%（空欄=自動）</label><input type="number" id="in-p100" placeholder="自動"></div>
   <div class="field"><label>品質/100%（空欄=自動）</label><input type="number" id="in-q100" placeholder="自動"></div>
@@ -111,8 +112,9 @@ function generate(){
   const craft= +document.getElementById("in-craft").value||0;
   const ctrl = +document.getElementById("in-control").value||0;
   const cp   = +document.getElementById("in-cp").value||0;
-  const p100 = +document.getElementById("in-p100").value || Math.floor(craft*10/180+2);
-  const q100 = +document.getElementById("in-q100").value || Math.floor(ctrl*10/180+35);
+  // 既定はA級ミッション実測（進捗divider≒190/品質divider≒208）より安全側の見積り
+  const p100 = +document.getElementById("in-p100").value || Math.floor(craft*10/195+2);
+  const q100 = +document.getElementById("in-q100").value || Math.floor(ctrl*10/215+35);
 
   const out = document.getElementById("out");
   if(!prog||!dur||!craft){ out.innerHTML = '<p class="badmsg">工数・耐久・作業精度は必須です</p>'; return; }
@@ -181,8 +183,10 @@ function buildPlan(cfg){
     seq.push(A.mm()); cum = mmGain; // 品質不要なら確信スタートで最速
   }
   if(cum < prog){
+    if(qual > 0) seq.push({n:"匠の絶技", w:2, dur:0, cp:0}); // 次の下地作業の耐久消費を0に
     seq.push(A.vene()); veneLeft = 4;
     const gw = A.gw(qual<=0 ? 2.5 : 1.5); // 確信バフは品質不要ルートのみ
+    if(qual > 0) gw.dur = 0; // 匠の絶技適用
     seq.push(gw); cum += gw.pGain; veneLeft--;
     let guard = 0;
     while(cum < prog && guard++ < 30){
@@ -192,22 +196,37 @@ function buildPlan(cfg){
   }
 
   // ---- シミュレーション（耐久・CP検証）----
-  let d = dur, cpUse = 0, manipLeft = 0, durOk = true, pTotal = 0, qTotal = 0;
-  for(let i=0;i<seq.length;i++){
-    const a = seq[i];
-    cpUse += a.cp;
-    if(a.pGain) pTotal += a.pGain;
-    if(a.qGain) qTotal += a.qGain;
-    const isLast = (i === seq.length-1);
-    if(a.dur > 0){
-      d -= a.dur;
-      if(d <= 0 && !isLast){ durOk = false; }
+  function simulate(){
+    let d = dur, cpUse = 0, manipLeft = 0, durOk = true, pTotal = 0, qTotal = 0;
+    for(let i=0;i<seq.length;i++){
+      const a = seq[i];
+      cpUse += a.cp;
+      if(a.pGain) pTotal += a.pGain;
+      if(a.qGain) qTotal += a.qGain;
+      const isLast = (i === seq.length-1);
+      if(a.dur > 0){
+        d -= a.dur;
+        if(d <= 0 && !isLast){ durOk = false; }
+      }
+      if(a.noStep) continue;
+      if(a.buff === "manip"){ manipLeft = 8; continue; }
+      if(manipLeft > 0){ d = Math.min(dur, d+5); manipLeft--; }
     }
-    if(a.noStep) continue;
-    if(a.buff === "manip"){ manipLeft = 8; continue; }
-    if(manipLeft > 0){ d = Math.min(dur, d+5); manipLeft--; }
+    return {d, cpUse, durOk, pTotal, qTotal};
   }
-  return {seq, durOk, cpUse, pTotal, progOk: pTotal >= prog, qTotal: tq + byG(iq), nTouch, durLeft: d};
+  let sim = simulate();
+  // CP不足なら、ヴェネ効果が同じ「倹約作業→模範作業」置換でCPを節約（1回あたり-11CP/+5耐久）
+  while(sim.cpUse > cp){
+    const i = seq.map(a=>a.n).lastIndexOf("倹約作業");
+    if(i < 0) break;
+    const old = seq[i];
+    seq[i] = {n:"模範作業", w:3, dur:10, cp:7, pGain: old.pGain};
+    const s2 = simulate();
+    if(!s2.durOk){ seq[i] = old; break; } // 耐久が保てないなら戻して終了
+    sim = s2;
+  }
+  return {seq, durOk: sim.durOk, cpUse: sim.cpUse, pTotal: sim.pTotal, progOk: sim.pTotal >= prog,
+          qTotal: tq + byG(iq), nTouch, durLeft: sim.d};
 }
 
 function render(r, cfg){
