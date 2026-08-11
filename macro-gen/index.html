@@ -84,7 +84,8 @@
 <div id="out"></div>
 
 <p class="note">・マクロは「真価→倹約加工でIQ積み→グレスト＋ビエルゴで品質完成 → ヴェネ＋作業系で工数を上げて完成」の型です<br>
-・進捗/品質の見積もりは控えめ（rlvl776基準）。実レシピが簡単な分には早めに完成して残りが空振りするだけで無害<br>
+・進捗/品質の見積もりは控えめ。実レシピが簡単な分には早めに完成して残りが空振りするだけで無害<br>
+・全行 &lt;wait.3&gt; の低速安全仕様（wait.2連続はラグで行が消える事故があるため）。品質は目標の15%増しで計画<br>
 ・品質やCPが届かない場合は生成時に警告が出ます（食事・薬や装備更新を検討）<br>
 ・Final Fantasy XIV © SQUARE ENIX CO., LTD. 非公式ファンメイドツール</p>
 
@@ -125,12 +126,15 @@ function generate(){
   // テンプレは2種: q=品質先積み型（品質重視レシピ向け） / p=工数先行型（工数の重いレシピ向け）
   // CPが足りなければタッチを減らして品質を妥協し、完走と失敗回避を死守する
   const tryOrder = [];
-  for(let tr = 0; tr <= 8; tr++)
-    for(const manip2 of [false, true])
-      tryOrder.push({template:"q", touchCap: 16 - tr, manip2});
-  for(let mm = 2; mm <= 4; mm++)
+  // 品質マージン15%は「取れるなら取る」: マージン込みで全滅したらマージンなしで再試行
+  for(const qMargin of [1.15, 1.0]){
     for(let tr = 0; tr <= 8; tr++)
-      tryOrder.push({template:"p", touchCap: 16 - tr, maxManips: mm});
+      for(const manip2 of [false, true])
+        tryOrder.push({template:"q", touchCap: 16 - tr, manip2, qMargin});
+    for(let mm = 2; mm <= 4; mm++)
+      for(let tr = 0; tr <= 8; tr++)
+        tryOrder.push({template:"p", touchCap: 16 - tr, maxManips: mm, qMargin});
+  }
   let result = null;
   for(const opt of tryOrder){
     const r = buildPlan(Object.assign({prog, qual, dur, cp, p100, q100}, opt));
@@ -159,6 +163,8 @@ function buildPlan(cfg){
   };
 
   const cap = cfg.touchCap != null ? cfg.touchCap : 16;
+  // 品質はマージン込みで計画（不調的な半減状態や下振れへの保険。資源が足りなければマージンなしで再試行される）
+  const qTarget = Math.ceil(qual * (cfg.qMargin || 1));
   let iq = 0, tq = 0, nTouch = 0;
   const touchGain = k=>Math.floor(q100*(1+0.1*Math.min(k,10))*1.5);
   const byG     = k=>Math.floor(q100*(1+0.2*Math.min(k,10))*(1+Math.min(k,10)/10)*2.5); // イノベ+GS
@@ -189,10 +195,10 @@ function buildPlan(cfg){
     // 品質（真価なし・IQ0から）。GSは届かないときだけ使う
     let iqSim = 0;
     while(nTouch < cap){
-      if(tq + byGnoGS(iqSim) >= qual) break;
+      if(tq + byGnoGS(iqSim) >= qTarget) break;
       tq += touchGain(iqSim); if(iqSim<10) iqSim++; nTouch++;
     }
-    const useGS = tq + byGnoGS(iqSim) < qual;
+    const useGS = tq + byGnoGS(iqSim) < qTarget;
     let innovLeft = 0, placed = 0, iq2 = 0;
     while(placed < nTouch){
       if(innovLeft <= 0){ seq.push(A.innov()); innovLeft = 4; sinceManip++; }
@@ -222,7 +228,7 @@ function buildPlan(cfg){
     seq.push(refl); tq = refl.qGain; iq = 2;
     // 必要タッチ数を先に決める（真価でIQ2スタート、touchCapで品質妥協が可能）
     while(nTouch < cap){
-      if(tq + byG(iq) >= qual) break;
+      if(tq + byG(iq) >= qTarget) break;
       tq += touchGain(iq);
       if(iq<10) iq++;
       nTouch++;
@@ -312,7 +318,8 @@ function render(r, cfg){
   if(r.durOk && qualOk && cpOk) html += `<p style="color:var(--ok);font-size:0.75rem;line-height:1.7;margin-top:8px;">✔ 製作失敗しない設計です: マクロが最後まで走っても耐久が${Math.max(0,r.durLeft)}残ります。万一未完成で終わったら「作業」を手で1〜2回押せば完成（品質は積み終わっているので評価は落ちません）</p>`;
 
   // マクロ分割（echo込み15行以内）
-  const lines = r.seq.map(a => `/ac ${a.n} <wait.${a.w}>`);
+  // 全行wait.3固定: wait.2連続だとラグ/硬直で行が空振りして消える事故が起きる（実報告2件）
+  const lines = r.seq.map(a => `/ac ${a.n} <wait.3>`);
   const chunks = [];
   for(let i=0; i<lines.length; i+=14) chunks.push(lines.slice(i, i+14));
   chunks.forEach((c, idx)=>{
