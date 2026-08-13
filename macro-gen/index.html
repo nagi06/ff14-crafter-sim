@@ -66,6 +66,7 @@
   <div class="field"><label>作業精度</label><input type="number" id="in-craft" value="4169"></div>
   <div class="field"><label>加工精度</label><input type="number" id="in-control" value="4650"></div>
   <div class="field"><label>CP</label><input type="number" id="in-cp" value="641"></div>
+  <div class="field"><label>マイスター<span class="hint">ON: 一心不乱＋集中加工とクイックイノベーションを組み込む</span></label><input type="checkbox" id="in-meister"></div>
 </div>
 
 <details>
@@ -94,16 +95,23 @@
 "use strict";
 const WAIT = {act:3, buff:2};
 // 入力値の保存・復元（ステータスはコスモツールの強化段階で変わるので前回値を記憶）
-const FIELDS = ["in-prog","in-qual","in-dur","in-init","in-craft","in-control","in-cp","in-p100","in-q100"];
+const FIELDS = ["in-prog","in-qual","in-dur","in-init","in-craft","in-control","in-cp","in-meister","in-p100","in-q100"];
 function saveInputs(){
   const o = {};
-  for(const id of FIELDS) o[id] = document.getElementById(id).value;
+  for(const id of FIELDS){
+    const el = document.getElementById(id);
+    o[id] = el.type === "checkbox" ? el.checked : el.value;
+  }
   try{ localStorage.setItem("macroGenInputs", JSON.stringify(o)); }catch(e){}
 }
 (function restoreInputs(){
   try{
     const o = JSON.parse(localStorage.getItem("macroGenInputs")||"null");
-    if(o) for(const id of FIELDS){ if(o[id]!==undefined) document.getElementById(id).value = o[id]; }
+    if(o) for(const id of FIELDS){
+      if(o[id]===undefined) continue;
+      const el = document.getElementById(id);
+      if(el.type === "checkbox") el.checked = !!o[id]; else el.value = o[id];
+    }
   }catch(e){}
 })();
 // name, 種別(step消費/耐久/CP), gain計算はプランナー側で
@@ -116,6 +124,7 @@ function generate(){
   const craft= +document.getElementById("in-craft").value||0;
   const ctrl = +document.getElementById("in-control").value||0;
   const cp   = +document.getElementById("in-cp").value||0;
+  const meister = document.getElementById("in-meister").checked;
   // 既定はA級ミッション実測（進捗divider≒190/品質divider≒208）より安全側の見積り
   const p100 = +document.getElementById("in-p100").value || Math.floor(craft*10/195+2);
   const q100 = +document.getElementById("in-q100").value || Math.floor(ctrl*10/215+35);
@@ -141,7 +150,7 @@ function generate(){
   }
   let result = null;
   for(const opt of tryOrder){
-    const r = buildPlan(Object.assign({prog, qual, dur, cp, p100, q100}, opt));
+    const r = buildPlan(Object.assign({prog, qual, dur, cp, p100, q100, meister}, opt));
     if(!result) result = r;
     if(r.durOk && r.cpUse <= cp){ result = r; break; }
   }
@@ -196,19 +205,34 @@ function buildPlan(cfg){
     };
     const qualityBlock = ()=>{
       // 品質（真価なし・IQ0から）。GSは届かないときだけ使う
-      let iqSim = 0;
+      let iqSim = 0, hsGain = 0;
+      if(cfg.meister && tq + byGnoGS(iqSim) < qTarget){
+        // 一心不乱→集中加工（150%・IQ+2）を先頭に。条件無視で確定発動
+        hsGain = Math.floor(q100*1.5*(1+0.1*iqSim)*1.5);
+        tq += hsGain; iqSim = Math.min(10, iqSim+2);
+      }
       while(nTouch < cap){
         if(tq + byGnoGS(iqSim) >= qTarget) break;
         tq += touchGain(iqSim); if(iqSim<10) iqSim++; nTouch++;
       }
       const useGS = tq + byGnoGS(iqSim) < qTarget;
       let innovLeft = 0, placed = 0, iq2 = 0;
+      if(hsGain > 0){
+        seq.push(A.innov()); innovLeft = 4; sinceManip++;
+        seq.push({n:"一心不乱", w:3, dur:0, cp:0, noStep:true});
+        seq.push({n:"集中加工", w:3, dur:10, cp:18, qGain:hsGain});
+        iq2 = Math.min(10, iq2+2); innovLeft--; sinceManip++;
+      }
       while(placed < nTouch){
         if(innovLeft <= 0){ seq.push(A.innov()); innovLeft = 4; sinceManip++; }
         pushTouch(iq2); if(iq2<10) iq2++; placed++; innovLeft--; sinceManip++;
       }
-      if(innovLeft < (useGS?2:1)){ seq.push(A.innov()); innovLeft = 4; sinceManip++; }
+      if(!cfg.meister && innovLeft < (useGS?2:1)){ seq.push(A.innov()); innovLeft = 4; sinceManip++; }
       if(useGS){ seq.push(A.gs()); innovLeft--; sinceManip++; }
+      if(innovLeft < 1){
+        if(cfg.meister){ seq.push({n:"クイックイノベーション", w:3, dur:0, cp:0, noStep:true}); innovLeft = 1; }
+        else { seq.push(A.innov()); innovLeft = 4; sinceManip++; }
+      }
       const by = A.by(iq2); if(!useGS) by.qGain = byGnoGS(iq2);
       seq.push(by); sinceManip++;
       iq = iqSim;
@@ -238,6 +262,12 @@ function buildPlan(cfg){
   if(qual > 0){
     const refl = {n:"真価", w:3, dur:10, cp:6, qGain:Math.floor(q100*3)};
     seq.push(refl); tq = refl.qGain; iq = 2;
+    // マイスターなら一心不乱→集中加工（150%・IQ+2）を先頭に確定発動
+    let hsGain = 0;
+    if(cfg.meister && tq + byG(iq) < qTarget){
+      hsGain = Math.floor(q100*1.5*(1+0.1*iq)*1.5);
+      tq += hsGain; iq = Math.min(10, iq+2);
+    }
     // 必要タッチ数を先に決める（真価でIQ2スタート、touchCapで品質妥協が可能）
     while(nTouch < cap){
       if(tq + byG(iq) >= qTarget) break;
@@ -248,14 +278,24 @@ function buildPlan(cfg){
     // 実シーケンス化
     seq.push(A.manip());
     let innovLeft = 0, placed = 0, iq2 = 2;
+    if(hsGain > 0){
+      seq.push(A.innov()); innovLeft = 4;
+      seq.push({n:"一心不乱", w:3, dur:0, cp:0, noStep:true});
+      seq.push({n:"集中加工", w:3, dur:10, cp:18, qGain:hsGain});
+      iq2 = Math.min(10, iq2+2); innovLeft--;
+    }
     const half = cfg.manip2 ? Math.ceil(nTouch/2) : -1;
     while(placed < nTouch){
       if(placed === half) seq.push(A.manip());
       if(innovLeft <= 0){ seq.push(A.innov()); innovLeft = 4; }
       pushTouch(iq2); if(iq2<10) iq2++; placed++; innovLeft--;
     }
-    if(innovLeft < 2){ seq.push(A.innov()); innovLeft = 4; }
+    if(!cfg.meister && innovLeft < 2){ seq.push(A.innov()); innovLeft = 4; }
     seq.push(A.gs()); innovLeft--;
+    if(innovLeft < 1){
+      if(cfg.meister) seq.push({n:"クイックイノベーション", w:3, dur:0, cp:0, noStep:true});
+      else { seq.push(A.innov()); innovLeft = 4; }
+    }
     seq.push(A.by(iq2));
   }
 
