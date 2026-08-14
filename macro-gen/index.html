@@ -67,7 +67,7 @@
   <div class="field"><label>加工精度</label><input type="number" id="in-control" value="4650"></div>
   <div class="field"><label>CP</label><input type="number" id="in-cp" value="641"></div>
   <div class="field"><label>マイスター<span class="hint">ON: 一心不乱＋集中加工とクイックイノベーションを組み込む</span></label><input type="checkbox" id="in-meister"></div>
-  <div class="field"><label>コンテンツアクション2<span class="hint">ON: コスモステディハンド→突貫作業×3（CP0）で工数を進め、浮いたCPを品質へ。コスモミッション専用（通常マクロでも手動仕上げでも使える）</span></label><input type="checkbox" id="in-ca2"></div>
+  <div class="field"><label>コンテンツアクション2<span class="hint">ON: コスモステディハンド→突貫作業×3（確定成功・CP0）で工数を進め、浮いたCPを品質へ。⚠製作画面にコンテンツアクションが出るミッション（EX+等）でだけON。CA2なしで品質が届く場合は自動で使わない</span></label><input type="checkbox" id="in-ca2"></div>
   <div class="field"><label>手動仕上げモード<span class="hint">ON: 〆（ビエルゴ・最終工数）を打たず、耐久・CP・匠の絶技を残して止まる。時限・天候EX+の高品質拾い向け（最終手段）</span></label><input type="checkbox" id="in-manual"></div>
 </div>
 
@@ -166,18 +166,31 @@ function generate(){
         for(let tr = 0; tr <= 8; tr++)
           tryOrder.push({template:"p", touchCap: 16 - tr, maxManips: mm, qMargin, earlyQuality});
   }
-  let result = null, bestScore = Infinity;
+  let feasiblePlain = null, feasibleCa2 = null, fallback = null, bestScore = Infinity;
   for(const opt of tryOrder){
     const r = buildPlan(Object.assign({prog, qual, dur, cp: cpBudget, p100, q100, meister}, opt));
     // 手動仕上げ時は「マクロ後に耐久25以上」を追加要求（手動タッチ・ビエルゴ・模範作業の分）
-    if(r.durOk && r.cpUse <= cpBudget && (!manual || r.durLeft >= 25)){ result = r; break; }
+    const ok = r.durOk && r.cpUse <= cpBudget && (!manual || r.durLeft >= 25);
+    if(ok){
+      if(opt.ca2){ if(!feasibleCa2) feasibleCa2 = r; }
+      else if(!feasiblePlain) feasiblePlain = r;
+      if(feasiblePlain && (feasibleCa2 || !ca2)) break; // 両系統の最良案が出揃ったら打ち切り
+      continue;
+    }
     // 全候補失格の場合に備え、違反量が最小の候補を控えとして保持（同点なら品質が高い方）
     const score = (r.durOk ? 0 : 1e9)
       + Math.max(0, r.cpUse - cpBudget) * 10
       + (manual ? Math.max(0, 25 - r.durLeft) * 10 : 0)
       - Math.min(r.qTotal, 99999) / 1e5;
-    if(score < bestScore){ bestScore = score; result = r; }
+    if(score < bestScore){ bestScore = score; fallback = r; }
   }
+  // 突貫作業（CA2）は「なしでは品質が届かない」ときだけ採用する。
+  // 通常ミッションのようにCA2なしで品質目標に届くなら、確定成功とはいえ突貫は混ぜない
+  const manualBonus = r => manual ? Math.floor(q100*(1+0.2*Math.min(r.finalIq,10))*(1+Math.min(r.finalIq,10)/10)*2.5) : 0;
+  const meets = r => r && (init + r.qTotal + manualBonus(r)) >= qualTarget;
+  let result;
+  if(feasiblePlain && (meets(feasiblePlain) || !feasibleCa2 || feasibleCa2.qTotal <= feasiblePlain.qTotal)) result = feasiblePlain;
+  else result = feasibleCa2 || feasiblePlain || fallback;
   render(result, {prog, qual: qualTarget, init, dur, cp, p100, q100, manual, reserve});
 }
 
