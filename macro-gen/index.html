@@ -68,6 +68,7 @@
   <div class="field"><label>CP</label><input type="number" id="in-cp" value="641"></div>
   <div class="field"><label>マイスター<span class="hint">ON: 一心不乱＋集中加工とクイックイノベーションを組み込む</span></label><input type="checkbox" id="in-meister"></div>
   <div class="field"><label>手動仕上げモード<span class="hint">ON: 〆（ビエルゴ・最終工数）を打たず、耐久・CP・匠の絶技を残して止まる。時限・天候EX+の高品質拾い向け</span></label><input type="checkbox" id="in-manual"></div>
+  <div class="field"><label>コンテンツアクション2<span class="hint">ON: コスモステディハンド→突貫作業×3（CP0）で工数を進め、浮いたCPを品質へ。コスモミッション専用（通常マクロでも手動仕上げでも使える）</span></label><input type="checkbox" id="in-ca2"></div>
 </div>
 
 <details>
@@ -97,7 +98,7 @@
 "use strict";
 const WAIT = {act:3, buff:2};
 // 入力値の保存・復元（ステータスはコスモツールの強化段階で変わるので前回値を記憶）
-const FIELDS = ["in-prog","in-qual","in-dur","in-init","in-craft","in-control","in-cp","in-meister","in-manual","in-p100","in-q100","in-reserve"];
+const FIELDS = ["in-prog","in-qual","in-dur","in-init","in-craft","in-control","in-cp","in-meister","in-manual","in-ca2","in-p100","in-q100","in-reserve"];
 function saveInputs(){
   const o = {};
   for(const id of FIELDS){
@@ -128,6 +129,7 @@ function generate(){
   const cp   = +document.getElementById("in-cp").value||0;
   const meister = document.getElementById("in-meister").checked;
   const manual = document.getElementById("in-manual").checked && qual > 0; // 品質不要レシピでは意味がないので無視
+  const ca2 = document.getElementById("in-ca2").checked; // コスモステディハンド（コスモミッション専用）
   const reserve = manual ? Math.max(0, +document.getElementById("in-reserve").value||170) : 0;
   const cpBudget = cp - reserve;
   // 既定はA級ミッション実測（進捗divider≒190/品質divider≒208）より安全側の見積り
@@ -148,14 +150,17 @@ function generate(){
     if(manual){
       // 手動仕上げ型のみ試行（〆を打たないので他テンプレとは混ぜない）
       // 低耐久レシピ（55等）はタッチを大きく削らないと耐久25残しが成立しないため、cap2まで探索
-      for(let tr = 0; tr <= 14; tr++)
-        for(const manip2 of [false, true])
-          tryOrder.push({template:"m", touchCap: 16 - tr, manip2, qMargin});
+      // コンテンツアクション2はCPを品質に回せるので、ONなら使用プランを優先して試す
+      for(const useCa2 of (ca2 ? [true, false] : [false]))
+        for(let tr = 0; tr <= 14; tr++)
+          for(const manip2 of [false, true])
+            tryOrder.push({template:"m", touchCap: 16 - tr, manip2, qMargin, ca2: useCa2});
       continue;
     }
-    for(let tr = 0; tr <= 8; tr++)
-      for(const manip2 of [false, true])
-        tryOrder.push({template:"q", touchCap: 16 - tr, manip2, qMargin});
+    for(const useCa2 of (ca2 ? [true, false] : [false]))
+      for(let tr = 0; tr <= 8; tr++)
+        for(const manip2 of [false, true])
+          tryOrder.push({template:"q", touchCap: 16 - tr, manip2, qMargin, ca2: useCa2});
     for(const earlyQuality of [false, true])
       for(let mm = 2; mm <= 4; mm++)
         for(let tr = 0; tr <= 8; tr++)
@@ -306,9 +311,20 @@ function buildPlan(cfg){
       pushTouch(iq2); if(iq2<10) iq2++; placed++; innovLeft--;
     }
     iq = iq2; // 手動ビエルゴ見込み計算用に最終IQを保持
-    // 工数72%まで（確信なし。倹約作業のみで耐久を節約し、早期完成事故のマージンを残す）
+    // 工数72%まで（確信なし。早期完成事故のマージンを残す）
     let cum = 0, veneLeft = 0, guard = 0;
     const pTarget = Math.floor(prog * 0.72);
+    if(cfg.ca2){
+      // コスモステディハンド: 3ターン確実成功 → 突貫作業（効率500%・CP0）を確定で撃てる
+      // 早期完成防止のため、突貫の見積りはヴェネ込み7.5倍で「多めに進む」前提に置く（実際に多く進んでも72%目標なら安全圏）
+      seq.push(A.vene()); veneLeft = 4;
+      seq.push({n:"コンテンツアクション2", w:3, dur:0, cp:0}); veneLeft--;
+      for(let i = 0; i < 3 && cum < pTarget; i++){
+        const s = {n:"突貫作業", w:3, dur:10, cp:0, pGain:Math.floor(p100*5.0*1.5)};
+        if(veneLeft <= 0){ seq.push(A.vene()); veneLeft = 4; }
+        seq.push(s); cum += s.pGain; veneLeft--;
+      }
+    }
     while(cum < pTarget && guard++ < 30){
       if(veneLeft <= 0){ seq.push(A.vene()); veneLeft = 4; }
       const s = A.ps(1.5); seq.push(s); cum += s.pGain; veneLeft--;
@@ -362,9 +378,18 @@ function buildPlan(cfg){
   if(qual <= 0){
     seq.push(A.mm()); cum = mmGain; // 品質不要なら確信スタートで最速
   }
-  if(cum < prog){
-    if(qual > 0) seq.push({n:"匠の絶技", w:2, dur:0, cp:0}); // 次の下地作業の耐久消費を0に
+  if(cum < prog && cfg.ca2){
+    // コスモステディハンド: 突貫作業（500%・CP0）を3連確定。ヴェネの残りターン内に収める
     seq.push(A.vene()); veneLeft = 4;
+    seq.push({n:"コンテンツアクション2", w:3, dur:0, cp:0}); veneLeft--;
+    for(let i = 0; i < 3 && cum < prog; i++){
+      const s = {n:"突貫作業", w:3, dur:10, cp:0, pGain:Math.floor(p100*5.0*1.5)};
+      seq.push(s); cum += s.pGain; veneLeft--;
+    }
+  }
+  if(cum < prog){
+    if(qual > 0){ seq.push({n:"匠の絶技", w:2, dur:0, cp:0}); if(veneLeft > 0) veneLeft--; } // 次の下地作業の耐久消費を0に
+    if(veneLeft <= 0){ seq.push(A.vene()); veneLeft = 4; }
     const gw = A.gw(qual<=0 ? 2.5 : 1.5); // 確信バフは品質不要ルートのみ
     if(qual > 0) gw.dur = 0; // 匠の絶技適用
     seq.push(gw); cum += gw.pGain; veneLeft--;
