@@ -276,7 +276,8 @@
   <ul>
     <li>素のビエルゴだけでは31500に届かないことが多い。<b>イノベ＋グレストを維持したまま経過観察や設計変更で流し、高品質(1.5倍)が来た瞬間にビエルゴ</b>を叩き込むのが勝ち筋</li>
     <li>高品質ビエルゴ（IQ10・GS・イノベ込み）は一撃約7,500。終盤にこれを1〜2回引けるかが勝負の分かれ目</li>
-    <li>残り品質と「ビエルゴ見込」チップを見比べて、届くならためらわず撃つ</li>
+    <li>残り品質と「ビエルゴ見込」チップ（通常／高品質1.5倍の両方を表示）を見比べて、届くならためらわず撃つ</li>
+    <li><b>待てるのはGSが残っている間だけ。</b>GSは3ターンなので観察で流せるのは実質2回、GS残り1になったら状態問わず撃ち切る（設計変更が残っていればターン消費なしで最後の引き直しが可能）。撃たずにGSを切らすのは32CPの丸損</li>
     <li>品質31500を超えたら<b>模範作業</b>で完成。耐久が足りない時は匠の絶技（消費0）を仕上げに残しておくと安全</li>
   </ul>
   <p class="note">実際にクリアした人の弁: 「IQ10からが本番」「グレストコンボで高品質お祈り」「下振れしても最後まで完走させろ（低確率で素材が戻る）」</p>
@@ -510,11 +511,11 @@ function qualGain(a, effOverride){
   let cond = st.condition==="good" ? 1.5 : 1;
   return Math.floor(Math.floor(baseQual()*iqMult + EPS) * eff * cond * mult + EPS);
 }
-function byregotEstimate(){
-  // 見込み表示用: 現在のIQ・バフ込み、状態は通常想定
+function byregotEstimate(condMult){
+  // 見込み表示用: 現在のIQ・バフ込み。condMult=1.5で高品質時の値
   let eff = (100+20*st.iq)/100;
   let mult = 1 + (st.buffs.innovation>0?0.5:0) + (st.buffs.greatStrides>0?1.0:0);
-  return Math.floor(Math.floor(baseQual()*(1+0.1*st.iq)+EPS) * eff * mult + EPS);
+  return Math.floor(Math.floor(baseQual()*(1+0.1*st.iq)+EPS) * eff * (condMult||1) * mult + EPS);
 }
 function byregotNow(){ return qualGain(A.byregot); } // 今この瞬間に撃った場合の正確な値（状態込み）
 
@@ -742,6 +743,13 @@ function recommendCore(){
   // 今ビエルゴを撃てば品質ラインに届くなら、何より優先で撃つ
   if(remQ>0 && st.iq>=1 && st.cp>=cpCost(A.byregot) && byregotNow() >= remQ && st.durability>durCost(A.byregot))
     return r("byregot","今のビエルゴ("+byregotNow().toLocaleString()+")で品質31500に届く！ためらわず撃つ");
+
+  // GSが今ターンで切れる → 待ちは終わり。設計変更（ターン消費なし）が残っていれば引き直してから、なければ状態問わずビエルゴ
+  if(st.buffs.greatStrides===1 && st.iq>=8 && remQ>0 && st.cp>=cpCost(A.byregot) && st.durability>durCost(A.byregot)){
+    if(cond!=="good" && st.coLeft>0)
+      return r("carefulObservation","GSが今ターンで切れる直前。設計変更はターンを消費しないので、高品質(1.5倍ビエルゴ)を引き直すラストチャンス");
+    return r("byregot","GSが今ターンで切れる。ここで撃たないと32CPが無駄になる。状態問わずビエルゴ！"+(cond==="good"?"（高品質1.5倍！）":""));
+  }
 
 
   // 品質達成済み → 完成させる
@@ -982,7 +990,9 @@ function render(){
   document.getElementById("b-dur").style.width = pct(st.durability,RECIPE.durability)+"%";
   document.getElementById("b-cp").style.width = pct(st.cp,maxCP())+"%";
   document.getElementById("v-iq").textContent = st.iq;
-  document.getElementById("v-byregot").textContent = st.iq>0 ? "+"+byregotEstimate().toLocaleString() : "-";
+  document.getElementById("v-byregot").innerHTML = st.iq>0
+    ? "+"+byregotEstimate().toLocaleString()+`<span style="font-size:0.62rem; color:var(--good);"> 高${byregotEstimate(1.5).toLocaleString()}</span>`
+    : "-";
   document.getElementById("v-remprog").textContent = Math.max(0,RECIPE.difficulty-st.progress).toLocaleString();
   document.getElementById("v-remqual").textContent = Math.max(0,RECIPE.requiredQuality-st.quality).toLocaleString();
   document.getElementById("stepNum").textContent = st.step;
