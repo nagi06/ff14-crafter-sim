@@ -67,6 +67,7 @@
   <div class="field"><label>加工精度</label><input type="number" id="in-control" value="4650"></div>
   <div class="field"><label>CP</label><input type="number" id="in-cp" value="641"></div>
   <div class="field"><label>マイスター<span class="hint">ON: 一心不乱＋集中加工とクイックイノベーションを組み込む</span></label><input type="checkbox" id="in-meister"></div>
+  <div class="field"><label>手動仕上げモード<span class="hint">ON: 〆（ビエルゴ・最終工数）を打たず、耐久・CP・匠の絶技を残して止まる。時限・天候EX+の高品質拾い向け</span></label><input type="checkbox" id="in-manual"></div>
 </div>
 
 <details>
@@ -78,6 +79,7 @@
 <div class="grid">
   <div class="field"><label>進捗/100%（空欄=自動）</label><input type="number" id="in-p100" placeholder="自動"></div>
   <div class="field"><label>品質/100%（空欄=自動）</label><input type="number" id="in-q100" placeholder="自動"></div>
+  <div class="field"><label>手動用に残すCP（手動仕上げON時）</label><input type="number" id="in-reserve" value="170"></div>
 </div>
 </details>
 
@@ -95,7 +97,7 @@
 "use strict";
 const WAIT = {act:3, buff:2};
 // 入力値の保存・復元（ステータスはコスモツールの強化段階で変わるので前回値を記憶）
-const FIELDS = ["in-prog","in-qual","in-dur","in-init","in-craft","in-control","in-cp","in-meister","in-p100","in-q100"];
+const FIELDS = ["in-prog","in-qual","in-dur","in-init","in-craft","in-control","in-cp","in-meister","in-manual","in-p100","in-q100","in-reserve"];
 function saveInputs(){
   const o = {};
   for(const id of FIELDS){
@@ -125,6 +127,9 @@ function generate(){
   const ctrl = +document.getElementById("in-control").value||0;
   const cp   = +document.getElementById("in-cp").value||0;
   const meister = document.getElementById("in-meister").checked;
+  const manual = document.getElementById("in-manual").checked && qual > 0; // 品質不要レシピでは意味がないので無視
+  const reserve = manual ? Math.max(0, +document.getElementById("in-reserve").value||170) : 0;
+  const cpBudget = cp - reserve;
   // 既定はA級ミッション実測（進捗divider≒190/品質divider≒208）より安全側の見積り
   const p100 = +document.getElementById("in-p100").value || Math.floor(craft*10/195+2);
   const q100 = +document.getElementById("in-q100").value || Math.floor(ctrl*10/215+35);
@@ -140,6 +145,13 @@ function generate(){
   const tryOrder = [];
   // 品質マージン15%は「取れるなら取る」: マージン込みで全滅したらマージンなしで再試行
   for(const qMargin of [1.15, 1.0]){
+    if(manual){
+      // 手動仕上げ型のみ試行（〆を打たないので他テンプレとは混ぜない）
+      for(let tr = 0; tr <= 8; tr++)
+        for(const manip2 of [false, true])
+          tryOrder.push({template:"m", touchCap: 16 - tr, manip2, qMargin});
+      continue;
+    }
     for(let tr = 0; tr <= 8; tr++)
       for(const manip2 of [false, true])
         tryOrder.push({template:"q", touchCap: 16 - tr, manip2, qMargin});
@@ -150,11 +162,12 @@ function generate(){
   }
   let result = null;
   for(const opt of tryOrder){
-    const r = buildPlan(Object.assign({prog, qual, dur, cp, p100, q100, meister}, opt));
+    const r = buildPlan(Object.assign({prog, qual, dur, cp: cpBudget, p100, q100, meister}, opt));
     if(!result) result = r;
-    if(r.durOk && r.cpUse <= cp){ result = r; break; }
+    // 手動仕上げ時は「マクロ後に耐久25以上」を追加要求（手動タッチ・ビエルゴ・模範作業の分）
+    if(r.durOk && r.cpUse <= cpBudget && (!manual || r.durLeft >= 25)){ result = r; break; }
   }
-  render(result, {prog, qual: qualTarget, init, dur, cp, p100, q100});
+  render(result, {prog, qual: qualTarget, init, dur, cp, p100, q100, manual, reserve});
 }
 
 function buildPlan(cfg){
@@ -256,6 +269,44 @@ function buildPlan(cfg){
       qualityBlock();
       finalProgress();
     }
+  } else if(cfg.template === "m" && qual > 0){
+    // ==== 手動仕上げ型（時限・天候EX+向け）====
+    // マクロは判断の要らない部分だけ: 真価→IQ積みタッチ→工数72%まで進めて止まる。
+    // GS→ビエルゴの〆・高品質拾い・最終工数は手動。匠の絶技も使わず温存（手動の下地作業を耐久0にする）
+    const refl = {n:"真価", w:3, dur:10, cp:6, qGain:Math.floor(q100*3)};
+    seq.push(refl); tq = refl.qGain; iq = 2;
+    let hsGain = 0;
+    if(cfg.meister && tq + byG(iq) < qTarget){
+      hsGain = Math.floor(q100*1.5*(1+0.1*iq)*1.5);
+      tq += hsGain; iq = Math.min(10, iq+2);
+    }
+    // タッチ数を決める（手動で撃つビエルゴ分は byG で見込む）
+    while(nTouch < cap){
+      if(tq + byG(iq) >= qTarget) break;
+      tq += touchGain(iq); if(iq<10) iq++; nTouch++;
+    }
+    seq.push(A.manip());
+    let innovLeft = 0, placed = 0, iq2 = 2;
+    if(hsGain > 0){
+      seq.push(A.innov()); innovLeft = 4;
+      seq.push({n:"一心不乱", w:3, dur:0, cp:0, noStep:true});
+      seq.push({n:"集中加工", w:3, dur:10, cp:18, qGain:hsGain});
+      iq2 = Math.min(10, iq2+2); innovLeft--;
+    }
+    const half = cfg.manip2 ? Math.ceil(nTouch/2) : -1;
+    while(placed < nTouch){
+      if(placed === half) seq.push(A.manip());
+      if(innovLeft <= 0){ seq.push(A.innov()); innovLeft = 4; }
+      pushTouch(iq2); if(iq2<10) iq2++; placed++; innovLeft--;
+    }
+    iq = iq2; // 手動ビエルゴ見込み計算用に最終IQを保持
+    // 工数72%まで（確信なし。倹約作業のみで耐久を節約し、早期完成事故のマージンを残す）
+    let cum = 0, veneLeft = 0, guard = 0;
+    const pTarget = Math.floor(prog * 0.72);
+    while(cum < pTarget && guard++ < 30){
+      if(veneLeft <= 0){ seq.push(A.vene()); veneLeft = 4; }
+      const s = A.ps(1.5); seq.push(s); cum += s.pGain; veneLeft--;
+    }
   } else {
   // ==== 品質先積み型（既定。品質重視のレシピ用）====
   // レシピが見積りより簡単な場合、工数フェーズの途中で早めに完成するだけで事故らない
@@ -350,24 +401,54 @@ function buildPlan(cfg){
     sim = s2;
   }
   return {seq, durOk: sim.durOk, cpUse: sim.cpUse, pTotal: sim.pTotal, progOk: sim.pTotal >= prog,
-          qTotal: sim.qTotal, nTouch, durLeft: sim.d};
+          qTotal: sim.qTotal, nTouch, durLeft: sim.d, finalIq: iq};
 }
 
 function render(r, cfg){
   const out = document.getElementById("out");
   let html = "";
-  const qualOk = cfg.qual <= 0 || (cfg.init + r.qTotal) >= cfg.qual;
-  const cpOk = r.cpUse <= cfg.cp;
-  html += `<div class="summary-box">
-    進捗見込 <b>${r.pTotal.toLocaleString()}</b> / ${cfg.prog.toLocaleString()}（品質を先に積むので、工数が早く満タンになっても安全）<br>
-    品質見込 <b>${(cfg.init + r.qTotal).toLocaleString()}</b> / ${(cfg.qual||0).toLocaleString()}（${cfg.init>0?`初期品質${cfg.init.toLocaleString()}＋`:""}タッチ${r.nTouch}回＋ビエルゴ）<br>
-    CP消費 <b>${r.cpUse}</b> / ${cfg.cp} ／ 耐久余裕 ${Math.max(0,r.durLeft)}<br>
-    <span style="color:var(--sub)">前提: 進捗${cfg.p100}/品質${cfg.q100}（100%あたり・控えめ見積り）</span>
-  </div>`;
-  if(!qualOk) html += `<p class="warnmsg">⚠ 品質が目標に届かない見積りです。食事・薬でステータスを盛るか、実レシピが簡単なことを祈って回してください（上級設定で実測値を入れると正確になります）</p>`;
-  if(!cpOk) html += `<p class="badmsg">✖ CPが${r.cpUse - cfg.cp}足りません。食事・薬を使うか、品質目標を下げてください</p>`;
+  const fi = Math.min(r.finalIq||0, 10);
+  const byEst = Math.floor(cfg.q100*(1+0.2*fi)*(1+fi/10)*2.5); // 手動で撃つイノベ+GSビエルゴの見込み
+  const qualOk = cfg.qual <= 0 || (cfg.init + r.qTotal + (cfg.manual?byEst:0)) >= cfg.qual;
+  const cpOk = r.cpUse <= cfg.cp - (cfg.manual?cfg.reserve:0);
+  const durLeft = Math.max(0, r.durLeft);
+  if(cfg.manual){
+    html += `<div class="summary-box">
+      進捗見込 <b>${r.pTotal.toLocaleString()}</b> / ${cfg.prog.toLocaleString()}（72%目標。仕上げは手動）<br>
+      品質見込 <b>${(cfg.init + r.qTotal).toLocaleString()}</b>＋手動ビエルゴ≈<b>${byEst.toLocaleString()}</b> / ${(cfg.qual||0).toLocaleString()}（${cfg.init>0?`初期品質${cfg.init.toLocaleString()}＋`:""}タッチ${r.nTouch}回、IQ${fi}到達・高品質拾いは別途上乗せ）<br>
+      CP消費 <b>${r.cpUse}</b> / ${cfg.cp}（手動用に${cfg.reserve}確保）／ マクロ後の耐久 ${durLeft}<br>
+      <span style="color:var(--sub)">前提: 進捗${cfg.p100}/品質${cfg.q100}（100%あたり・控えめ見積り）</span>
+    </div>`;
+  } else {
+    html += `<div class="summary-box">
+      進捗見込 <b>${r.pTotal.toLocaleString()}</b> / ${cfg.prog.toLocaleString()}（品質を先に積むので、工数が早く満タンになっても安全）<br>
+      品質見込 <b>${(cfg.init + r.qTotal).toLocaleString()}</b> / ${(cfg.qual||0).toLocaleString()}（${cfg.init>0?`初期品質${cfg.init.toLocaleString()}＋`:""}タッチ${r.nTouch}回＋ビエルゴ）<br>
+      CP消費 <b>${r.cpUse}</b> / ${cfg.cp} ／ 耐久余裕 ${durLeft}<br>
+      <span style="color:var(--sub)">前提: 進捗${cfg.p100}/品質${cfg.q100}（100%あたり・控えめ見積り）</span>
+    </div>`;
+  }
+  if(!qualOk){
+    if(cfg.manual) html += `<p class="warnmsg">⚠ ビエルゴ込みでも見積り上は品質が届きません。不足分（約${(cfg.qual - cfg.init - r.qTotal - byEst).toLocaleString()}）は手動の高品質拾い（集中加工・秘訣）で埋める前提になります</p>`;
+    else html += `<p class="warnmsg">⚠ 品質が目標に届かない見積りです。食事・薬でステータスを盛るか、実レシピが簡単なことを祈って回してください（上級設定で実測値を入れると正確になります）</p>`;
+  }
+  if(!cpOk) html += `<p class="badmsg">✖ CPが${r.cpUse - (cfg.cp - (cfg.manual?cfg.reserve:0))}足りません。${cfg.manual?"「手動用に残すCP」を減らすか、":""}食事・薬を使うか、品質目標を下げてください</p>`;
   if(!r.durOk) html += `<p class="badmsg">✖ 耐久を黒字にできませんでした（CP不足で節約手が使えない等）。薬でCPを増やすか、1ランク下のミッションを推奨</p>`;
-  if(r.durOk && qualOk && cpOk) html += `<p style="color:var(--ok);font-size:0.75rem;line-height:1.7;margin-top:8px;">✔ 製作失敗しない設計です: マクロが最後まで走っても耐久が${Math.max(0,r.durLeft)}残ります。万一未完成で終わったら「作業」を手で1〜2回押せば完成（品質は積み終わっているので評価は落ちません）</p>`;
+  if(cfg.manual && r.durOk && r.durLeft < 25) html += `<p class="badmsg">✖ マクロ後の耐久が${durLeft}しか残りません（手動パートに25以上必要）。品質目標を下げるか、1ランク下のミッションを推奨</p>`;
+  if(r.durOk && qualOk && cpOk && !cfg.manual) html += `<p style="color:var(--ok);font-size:0.75rem;line-height:1.7;margin-top:8px;">✔ 製作失敗しない設計です: マクロが最後まで走っても耐久が${durLeft}残ります。万一未完成で終わったら「作業」を手で1〜2回押せば完成（品質は積み終わっているので評価は落ちません）</p>`;
+  if(cfg.manual && r.durOk && cpOk && r.durLeft >= 25){
+    const progLeft = Math.max(0, cfg.prog - r.pTotal);
+    const gwEst = Math.floor(cfg.p100*3.6*1.5); // 絶技＋ヴェネ下地作業
+    const psEst = Math.floor(cfg.p100*1.8*1.5); // ヴェネ模範作業
+    const nPs = Math.max(0, Math.ceil((progLeft - gwEst) / psEst));
+    html += `<p style="color:var(--ok);font-size:0.75rem;line-height:1.7;margin-top:8px;">✔ 手動仕上げ前提の安全設計: マクロ後に耐久${durLeft}・CP約${cfg.cp - r.cpUse}・匠の絶技（未使用）を残します</p>
+    <div class="summary-box">
+      <b>手動パートの手順メモ</b>（残り工数 約${progLeft.toLocaleString()}）<br>
+      ① 高品質が出たら拾う: 集中加工（IQ${fi}なら1回≈${Math.floor(cfg.q100*1.5*(1+0.1*fi)*1.5).toLocaleString()}・イノベ中）／CPが惜しければ秘訣。出なければ経過観察で流してもよい<br>
+      ② 品質を〆る: イノベ→グレートストライド→ビエルゴ（≈${byEst.toLocaleString()}）<br>
+      ③ 工数仕上げ: ヴェネ→匠の絶技→下地作業（≈${gwEst.toLocaleString()}・耐久0）${nPs>0?`→模範作業×${nPs}（≈${psEst.toLocaleString()}/回）`:""}で完成<br>
+      <span style="color:var(--sub)">※②の前ならタッチ追加も自由。耐久と要相談（残り${durLeft}、ビエルゴ10＋模範作業10/回）</span>
+    </div>`;
+  }
 
   // マクロ分割（echo込み15行以内）
   // 全行wait.3固定: wait.2連続だとラグ/硬直で行が空振りして消える事故が起きる（実報告2件）
@@ -376,7 +457,7 @@ function render(r, cfg){
   for(let i=0; i<lines.length; i+=14) chunks.push(lines.slice(i, i+14));
   chunks.forEach((c, idx)=>{
     const isLast = idx === chunks.length-1;
-    c.push(isLast ? `/e 完成！ <se.14>` : `/e マクロ${idx+1}おわり <se.1>`);
+    c.push(isLast ? (cfg.manual ? `/e マクロ終了、ここから手動！ <se.14>` : `/e 完成！ <se.14>`) : `/e マクロ${idx+1}おわり <se.1>`);
     const text = c.join("\n");
     html += `<div class="macro"><div class="head"><span>マクロ${idx+1}（${c.length}行）</span>
       <button onclick="copyMacro(this)">コピー</button></div>
