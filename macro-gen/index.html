@@ -67,7 +67,12 @@
   <div class="field"><label>加工精度</label><input type="number" id="in-control" value="4650"></div>
   <div class="field"><label>CP</label><input type="number" id="in-cp" value="641"></div>
   <div class="field"><label>マイスター<span class="hint">ON: 一心不乱＋集中加工とクイックイノベーションを組み込む</span></label><input type="checkbox" id="in-meister"></div>
-  <div class="field"><label>コンテンツアクション2<span class="hint">ON: コスモステディハンド→突貫作業×3（確定成功・CP0）で工数を進め、浮いたCPを品質へ。⚠製作画面にコンテンツアクションが出るミッション（EX+等）でだけON。CA2なしで品質が届く場合は自動で使わない</span></label><input type="checkbox" id="in-ca2"></div>
+  <div class="field"><label>コンテンツアクション2<span class="hint">CA2の中身はミッションごとに違う（製作画面で要確認）。ステディハンド=突貫×3で工数を進めCPを品質へ（品質が届かないときだけ自動使用）／ミラクルマテリアル=ビエルゴ直前に発動して低品質半減事故をガード</span></label>
+    <select id="in-ca2" style="width:100%; background:#12141b; border:1px solid var(--line); border-radius:6px; color:var(--text); font-size:0.85rem; padding:6px 8px;">
+      <option value="">使わない</option>
+      <option value="steady">コスモステディハンド（突貫型）</option>
+      <option value="miracle">ミラクルマテリアル（低品質ガード）</option>
+    </select></div>
   <div class="field"><label>手動仕上げモード<span class="hint">ON: 〆（ビエルゴ・最終工数）を打たず、耐久・CP・匠の絶技を残して止まる。時限・天候EX+の高品質拾い向け（最終手段）</span></label><input type="checkbox" id="in-manual"></div>
 </div>
 
@@ -129,7 +134,9 @@ function generate(){
   const cp   = +document.getElementById("in-cp").value||0;
   const meister = document.getElementById("in-meister").checked;
   const manual = document.getElementById("in-manual").checked && qual > 0; // 品質不要レシピでは意味がないので無視
-  const ca2 = document.getElementById("in-ca2").checked; // コスモステディハンド（コスモミッション専用）
+  const ca2sel = document.getElementById("in-ca2").value; // CA2の中身（ミッションごとに違う）
+  const ca2 = ca2sel === "steady";       // コスモステディハンド: 突貫×3プランを解禁
+  const miracle = ca2sel === "miracle";  // ミラクルマテリアル: ビエルゴ直前に発動して低品質をガード
   const reserve = manual ? Math.max(0, +document.getElementById("in-reserve").value||170) : 0;
   const cpBudget = cp - reserve;
   // 既定はA級ミッション実測（進捗divider≒190/品質divider≒208）より安全側の見積り
@@ -168,7 +175,7 @@ function generate(){
   }
   let feasiblePlain = null, feasibleCa2 = null, fallback = null, bestScore = Infinity;
   for(const opt of tryOrder){
-    const r = buildPlan(Object.assign({prog, qual, dur, cp: cpBudget, p100, q100, meister}, opt));
+    const r = buildPlan(Object.assign({prog, qual, dur, cp: cpBudget, p100, q100, meister, miracle}, opt));
     // 手動仕上げ時は「マクロ後に耐久25以上」を追加要求（手動タッチ・ビエルゴ・模範作業の分）
     const ok = r.durOk && r.cpUse <= cpBudget && (!manual || r.durLeft >= 25);
     if(ok){
@@ -191,7 +198,7 @@ function generate(){
   let result;
   if(feasiblePlain && (meets(feasiblePlain) || !feasibleCa2 || feasibleCa2.qTotal <= feasiblePlain.qTotal)) result = feasiblePlain;
   else result = feasibleCa2 || feasiblePlain || fallback;
-  render(result, {prog, qual: qualTarget, init, dur, cp, p100, q100, manual, reserve});
+  render(result, {prog, qual: qualTarget, init, dur, cp, p100, q100, manual, reserve, miracle});
 }
 
 function buildPlan(cfg){
@@ -264,6 +271,7 @@ function buildPlan(cfg){
         if(innovLeft <= 0){ seq.push(A.innov()); innovLeft = 4; sinceManip++; }
         pushTouch(iq2); if(iq2<10) iq2++; placed++; innovLeft--; sinceManip++;
       }
+      if(cfg.miracle){ seq.push({n:"コンテンツアクション2", w:3, dur:0, cp:0}); innovLeft--; sinceManip++; } // ミラクルマテリアル: ビエルゴを低品質半減から守る
       if(!cfg.meister && innovLeft < (useGS?2:1)){ seq.push(A.innov()); innovLeft = 4; sinceManip++; }
       if(useGS){ seq.push(A.gs()); innovLeft--; sinceManip++; }
       if(innovLeft < 1){
@@ -376,6 +384,7 @@ function buildPlan(cfg){
       if(innovLeft <= 0){ seq.push(A.innov()); innovLeft = 4; }
       pushTouch(iq2); if(iq2<10) iq2++; placed++; innovLeft--;
     }
+    if(cfg.miracle){ seq.push({n:"コンテンツアクション2", w:3, dur:0, cp:0}); innovLeft--; } // ミラクルマテリアル: 直後のGS→ビエルゴを低品質半減から守る
     if(!cfg.meister && innovLeft < 2){ seq.push(A.innov()); innovLeft = 4; }
     seq.push(A.gs()); innovLeft--;
     if(innovLeft < 1){
@@ -488,7 +497,7 @@ function render(r, cfg){
     <div class="summary-box">
       <b>手動パートの手順メモ</b>（残り工数 約${progLeft.toLocaleString()}）<br>
       ① 高品質が出たら拾う: 集中加工（IQ${fi}なら1回≈${Math.floor(cfg.q100*1.5*(1+0.1*fi)*1.5).toLocaleString()}・イノベ中）／CPが惜しければ秘訣。出なければ経過観察で流してもよい<br>
-      ② 品質を〆る: イノベ→グレートストライド→ビエルゴ（≈${byEst.toLocaleString()}）<br>
+      ② 品質を〆る: ${cfg.miracle?"<b>コンテンツアクション2（ミラクルマテリアル）</b>→":""}イノベ→グレートストライド→ビエルゴ（≈${byEst.toLocaleString()}）${cfg.miracle?"。低品質が出なくなるので安心して撃てる":""}<br>
       ③ 工数仕上げ: ヴェネ→匠の絶技→下地作業（≈${gwEst.toLocaleString()}・耐久0）${nPs>0?`→模範作業×${nPs}（≈${psEst.toLocaleString()}/回）`:""}で完成<br>
       <span style="color:var(--sub)">※②の前ならタッチ追加も自由。耐久と要相談（残り${durLeft}、ビエルゴ10＋模範作業10/回）</span>
     </div>`;
