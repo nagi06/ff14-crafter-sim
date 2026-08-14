@@ -147,7 +147,8 @@ function generate(){
   for(const qMargin of [1.15, 1.0]){
     if(manual){
       // 手動仕上げ型のみ試行（〆を打たないので他テンプレとは混ぜない）
-      for(let tr = 0; tr <= 8; tr++)
+      // 低耐久レシピ（55等）はタッチを大きく削らないと耐久25残しが成立しないため、cap2まで探索
+      for(let tr = 0; tr <= 14; tr++)
         for(const manip2 of [false, true])
           tryOrder.push({template:"m", touchCap: 16 - tr, manip2, qMargin});
       continue;
@@ -160,12 +161,17 @@ function generate(){
         for(let tr = 0; tr <= 8; tr++)
           tryOrder.push({template:"p", touchCap: 16 - tr, maxManips: mm, qMargin, earlyQuality});
   }
-  let result = null;
+  let result = null, bestScore = Infinity;
   for(const opt of tryOrder){
     const r = buildPlan(Object.assign({prog, qual, dur, cp: cpBudget, p100, q100, meister}, opt));
-    if(!result) result = r;
     // 手動仕上げ時は「マクロ後に耐久25以上」を追加要求（手動タッチ・ビエルゴ・模範作業の分）
     if(r.durOk && r.cpUse <= cpBudget && (!manual || r.durLeft >= 25)){ result = r; break; }
+    // 全候補失格の場合に備え、違反量が最小の候補を控えとして保持（同点なら品質が高い方）
+    const score = (r.durOk ? 0 : 1e9)
+      + Math.max(0, r.cpUse - cpBudget) * 10
+      + (manual ? Math.max(0, 25 - r.durLeft) * 10 : 0)
+      - Math.min(r.qTotal, 99999) / 1e5;
+    if(score < bestScore){ bestScore = score; result = r; }
   }
   render(result, {prog, qual: qualTarget, init, dur, cp, p100, q100, manual, reserve});
 }
