@@ -168,20 +168,30 @@ function generate(){
       for(let tr = 0; tr <= 8; tr++)
         for(const manip2 of [false, true])
           tryOrder.push({template:"q", touchCap: 16 - tr, manip2, qMargin, ca2: useCa2});
+    // コンボ型（加工コンボ＋パーフェクトメンド）: q型で品質が届かない高工数×高品質ミッション向け
+    for(let f = 6; f >= 0; f--)
+      for(const mend2 of [true, false])
+        tryOrder.push({template:"c", finesse: f, mend2, qMargin});
     for(const earlyQuality of [false, true])
       for(let mm = 2; mm <= 4; mm++)
         for(let tr = 0; tr <= 8; tr++)
           tryOrder.push({template:"p", touchCap: 16 - tr, maxManips: mm, qMargin, earlyQuality});
   }
-  let feasiblePlain = null, feasibleCa2 = null, fallback = null, bestScore = Infinity;
+  const manualBonus = r => manual ? Math.floor(q100*(1+0.2*Math.min(r.finalIq,10))*(1+Math.min(r.finalIq,10)/10)*2.5) : 0;
+  const meets = r => r && (init + r.qTotal + manualBonus(r)) >= qualTarget;
+  let plainMeets = null, ca2Meets = null, bestPlain = null, bestCa2 = null, fallback = null, bestScore = Infinity;
   for(const opt of tryOrder){
     const r = buildPlan(Object.assign({prog, qual, dur, cp: cpBudget, p100, q100, meister, miracle}, opt));
     // 手動仕上げ時は「マクロ後に耐久25以上」を追加要求（手動タッチ・ビエルゴ・模範作業の分）
     const ok = r.durOk && r.cpUse <= cpBudget && (!manual || r.durLeft >= 25);
     if(ok){
-      if(opt.ca2){ if(!feasibleCa2) feasibleCa2 = r; }
-      else if(!feasiblePlain) feasiblePlain = r;
-      if(feasiblePlain && (feasibleCa2 || !ca2)) break; // 両系統の最良案が出揃ったら打ち切り
+      if(opt.ca2){
+        if(!ca2Meets && meets(r)) ca2Meets = r;
+        if(!bestCa2 || r.qTotal > bestCa2.qTotal) bestCa2 = r;
+      } else {
+        if(meets(r)){ plainMeets = r; break; } // CA2なしで品質目標を満たす最初（=最短系）のプランで確定
+        if(!bestPlain || r.qTotal > bestPlain.qTotal) bestPlain = r;
+      }
       continue;
     }
     // 全候補失格の場合に備え、違反量が最小の候補を控えとして保持（同点なら品質が高い方）
@@ -191,13 +201,10 @@ function generate(){
       - Math.min(r.qTotal, 99999) / 1e5;
     if(score < bestScore){ bestScore = score; fallback = r; }
   }
-  // 突貫作業（CA2）は「なしでは品質が届かない」ときだけ採用する。
-  // 通常ミッションのようにCA2なしで品質目標に届くなら、確定成功とはいえ突貫は混ぜない
-  const manualBonus = r => manual ? Math.floor(q100*(1+0.2*Math.min(r.finalIq,10))*(1+Math.min(r.finalIq,10)/10)*2.5) : 0;
-  const meets = r => r && (init + r.qTotal + manualBonus(r)) >= qualTarget;
-  let result;
-  if(feasiblePlain && (meets(feasiblePlain) || !feasibleCa2 || feasibleCa2.qTotal <= feasiblePlain.qTotal)) result = feasiblePlain;
-  else result = feasibleCa2 || feasiblePlain || fallback;
+  // 選択の優先順位: CA2なしで目標達成 > CA2（突貫）で目標達成 > 実現可能な中で品質最大 > 違反最小の控え
+  let result = plainMeets || ca2Meets
+    || (bestPlain && bestCa2 ? (bestCa2.qTotal > bestPlain.qTotal ? bestCa2 : bestPlain) : (bestPlain || bestCa2))
+    || fallback;
   render(result, {prog, qual: qualTarget, init, dur, cp, p100, q100, manual, reserve, miracle});
 }
 
@@ -350,6 +357,50 @@ function buildPlan(cfg){
       if(veneLeft <= 0){ seq.push(A.vene()); veneLeft = 4; }
       const s = A.ps(1.5); seq.push(s); cum += s.pGain; veneLeft--;
     }
+  } else if(cfg.template === "c" && qual > 0){
+    // ==== コンボ型（にこるぜあ式。高工数×高品質×耐久60向け）====
+    // 加工→中級→上級コンボ（各18CP）とパーフェクトメンド（112CPで耐久全回復）で
+    // 「CPで耐久とタッチ数を買い、品質を限界まで積む」。マイスター不要
+    let innovLeft = 0;
+    const touch = (n, eff, tcp, tdur)=>{
+      const g = Math.floor(q100*eff*(1+0.1*Math.min(iq,10))*(innovLeft>0?1.5:1));
+      seq.push({n, w:3, dur:tdur, cp:tcp, qGain:g}); tq += g; if(iq<10) iq++; innovLeft--; nTouch++;
+    };
+    const innovC = ()=>{ seq.push(A.innov()); innovLeft = 4; };
+    const refl = {n:"真価", w:3, dur:10, cp:6, qGain:Math.floor(q100*3)};
+    seq.push(refl); tq = refl.qGain; iq = 2;
+    touch("倹約加工", 1.0, 25, 5); touch("倹約加工", 1.0, 25, 5); // 前置き（イノベなし）
+    for(let b = 0; b < 2; b++){ // コンボブロック×2、間にパーフェクトメンド
+      if(b === 1) seq.push({n:"パーフェクトメンド", w:3, dur:0, cp:112, mend:"full"});
+      innovC();
+      touch("倹約加工", 1.0, 25, 5);
+      touch("加工", 1.0, 18, 10);
+      touch("中級加工", 1.25, 18, 10);
+      touch("上級加工", 1.5, 18, 10);
+    }
+    // 神業ブロック（cfg.finesseまで。目標に届いたら打ち切り）
+    let placed = 0;
+    while(placed < (cfg.finesse||0)){
+      if(tq + byG(iq) >= qTarget) break;
+      if(innovLeft <= 0) innovC();
+      touch("匠の神業", 1.0, 32, 0);
+      placed++;
+    }
+    // 〆
+    if(cfg.miracle){ seq.push({n:"コンテンツアクション2", w:3, dur:0, cp:0}); innovLeft--; }
+    if(innovLeft < 2){ innovC(); }
+    seq.push(A.gs()); innovLeft--;
+    const byC = A.by(iq); byC.qGain = byG(iq); seq.push(byC);
+    // 工数フェーズ（真価スタートなので確信なし。絶技下地→倹約作業刻みの耐久節約型）
+    let cum = 0, veneLeft = 0, guard = 0;
+    if(cfg.mend2){ seq.push({n:"パーフェクトメンド", w:3, dur:0, cp:112, mend:"full"}); }
+    seq.push({n:"匠の絶技", w:2, dur:0, cp:0});
+    seq.push(A.vene()); veneLeft = 4;
+    { const g0 = A.gw(1.5); g0.dur = 0; seq.push(g0); cum += g0.pGain; veneLeft--; } // 絶技下地
+    while(cum < prog && guard++ < 30){
+      if(veneLeft <= 0){ seq.push(A.vene()); veneLeft = 4; }
+      const s = A.ps(1.5); seq.push(s); cum += s.pGain; veneLeft--;
+    }
   } else {
   // ==== 品質先積み型（既定。品質重視のレシピ用）====
   // レシピが見積りより簡単な場合、工数フェーズの途中で早めに完成するだけで事故らない
@@ -429,6 +480,7 @@ function buildPlan(cfg){
     for(let i=0;i<seq.length;i++){
       const a = seq[i];
       cpUse += a.cp;
+      if(a.mend === "full") d = dur; // パーフェクトメンド: 耐久全回復
       if(a.pGain) pTotal += a.pGain;
       if(a.qGain) qTotal += a.qGain;
       // 完成前提にしない: マクロが最後まで走っても耐久が尽きない（=製作失敗が起きない）ことを要求
