@@ -407,6 +407,8 @@ function buildPlan(cfg){
   if(qual > 0){
     const refl = {n:"真価", w:3, dur:10, cp:6, qGain:Math.floor(q100*3)};
     seq.push(refl); tq = refl.qGain; iq = 2;
+    if(tq >= qTarget){ /* 真価だけで品質目標を満たす（D級等の低品質ミッション）→ マニピュ・GS・ビエルゴを丸ごと省略 */ }
+    else {
     // マイスターなら一心不乱→集中加工（150%・IQ+2）を先頭に確定発動
     let hsGain = 0;
     if(cfg.meister && tq + byG(iq) < qTarget){
@@ -443,6 +445,7 @@ function buildPlan(cfg){
       else { seq.push(A.innov()); innovLeft = 4; }
     }
     seq.push(A.by(iq2));
+    }
   }
 
   // 工数フェーズ（最後。満タンに達した手で完成する）
