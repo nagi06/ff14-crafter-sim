@@ -1,1 +1,7 @@
 Daily/
+
+# MCシミュ出力（seed固定で再現可能・生ログ40MB超のため非コミット）
+aqueduct/mc/results*/
+aqueduct/mc/review_*/
+aqueduct/mc/smoke_*/
+aqueduct/mc/verify_*/
