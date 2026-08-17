@@ -459,7 +459,7 @@ function rollCondition(){
 function canUse(a){
   if(st.finished||st.failed) return false;
   if(st.awaitCond || pendingRapid) return false;
-  if(a.firstOnly && st.step!==1) return false;
+  if(a.firstOnly && (st.step!==1 || st.progress>0 || st.quality>0)) return false;
   if(a.id==="muscleMemory"||a.id==="reflect"){ if(st.step!==1) return false; }
   if(a.neverUsable) return false;
   if(a.needExpedience && !(st.buffs.expedience>0)) return false;
@@ -737,8 +737,8 @@ function recommendCore(){
 
   const r = (id, reason)=>({id, reason});
 
-  // 1ターン目
-  if(st.step===1) return r("muscleMemory","開幕は確信で進捗300%＋次の作業系を強化。工数フェーズを短く済ませるのが基本形");
+  // 1ターン目（真の製作開始時のみ。リカバリー入力でターン数が1のままの中間状態では出さない）
+  if(st.step===1 && st.progress===0 && st.quality===0) return r("muscleMemory","開幕は確信で進捗300%＋次の作業系を強化。工数フェーズを短く済ませるのが基本形");
 
   // 今ビエルゴを撃てば品質ラインに届くなら、何より優先で撃つ
   if(remQ>0 && st.iq>=1 && st.cp>=cpCost(A.byregot) && byregotNow() >= remQ && st.durability>durCost(A.byregot))
