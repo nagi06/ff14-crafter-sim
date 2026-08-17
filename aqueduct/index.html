@@ -751,7 +751,9 @@ function recommendCore(){
   const remP = RECIPE.difficulty - st.progress;
   const remQ = RECIPE.requiredQuality - st.quality;
   const careful = Math.floor(baseProg()*1.8);
-  const progDone = remP <= careful; // 模範作業1回で完成できる位置
+  // ハイブリッド運用対応: 匠の絶技が温存されていて、残り工数が「絶技→ヴェネ→下地×2」で〆られる圏内なら
+  // 工数フェーズは完了扱いにして品質のおすすめへ切り替える（前半マクロ後の中間状態でヴェネ連呼しない）
+  const progDone = remP <= careful || (!st.tpUsed && remP <= Math.floor(baseProg()*5.4)*2);
   const by = byregotEstimate();
 
   const r = (id, reason)=>({id, reason});
