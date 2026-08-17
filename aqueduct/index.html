@@ -734,7 +734,8 @@ function recommend(){
   const rec = recommendCore();
   if(rec && canUse(A[rec.id]) && !wouldDie(rec.id)) return rec;
   // 本命が撃てない/死ぬ場合: 延命・代替手
-  for(const id of ["trainedPerfection","manipulation","mastersMend","immaculateMend","trainedFinesse","tricks","observe","carefulObservation","prudentTouch","hastyTouch","basicTouch","byregot","carefulSynth","basicSynth"]){
+  // v4: 匠の絶技は〆専用に温存するため延命候補の最後尾へ（緊急消費が〆崩壊の主因だった）
+  for(const id of ["manipulation","mastersMend","immaculateMend","trainedFinesse","tricks","observe","carefulObservation","prudentTouch","hastyTouch","basicTouch","byregot","trainedPerfection","carefulSynth","basicSynth"]){
     if(canUse(A[id]) && !wouldDie(id)) return {id, reason:"（安全手）本命だと耐久0で失敗するため、延命できる手・実行可能な手から提案"};
   }
   for(const id of ["carefulSynth","basicSynth","rapidSynth"]){
@@ -769,10 +770,27 @@ function recommendCore(){
   }
 
 
-  // 品質達成済み → 完成させる
+  // 品質達成済み → 〆コンボで完成させる（v4: 模範連打は耐久が持たない。ヴェネ→(絶技)→下地で最短）
   if(remQ<=0){
+    const gwC = durCost(A.groundwork);
+    if(remP > Math.floor(baseProg()*1.8) && st.cp>=cpCost(A.groundwork)){
+      if(st.buffs.veneration<=0 && st.cp>=18+18) return r("veneration","品質達成！〆はヴェネ→下地作業で最短完成");
+      if(!st.tpUsed && st.durability<=gwC) return r("trainedPerfection","温存していた匠の絶技を解禁。次の下地作業を耐久消費0で");
+      if(st.durability>gwC || st.tpReady) return r("groundwork","〆の下地作業で一気に完成へ"+(st.buffs.veneration>0?"（ヴェネ込み360%）":""));
+    }
     if(st.cp>=cpCost(A.carefulSynth)) return r("carefulSynth","品質ライン達成済み。模範作業で完成させる");
     return r("basicSynth","品質達成済み。CP不足のため作業で完成させる");
+  }
+
+  // === コンボ貫通ドクトリン（v4 2026-08-18）===
+  // MC実測で三段コンボの貫通率が加工80→中級14→上級1と壊滅していたのが品質ペース不足の本丸。
+  // 始動したコンボは状態収穫（高品質・頑丈含む）より優先して繋ぎ切る。中断は耐久/CP的に不可能な時だけ
+  if(st.iq>=10){
+    const nx = st.lastAction==="basicTouch" ? "standardTouch" : st.lastAction==="standardTouch" ? "advancedTouch" : null;
+    if(nx && st.cp>=cpCost(A[nx]) && st.durability>durCost(A[nx]))
+      return r(nx, (nx==="standardTouch" ? "コンボ貫通！中級加工18CP(125%)。" : "コンボ〆の上級加工18CP(150%)。")
+        + "始動したコンボは状態収穫より優先で繋ぎ切る（v4）"
+        + (cond==="good" ? "。高品質1.75倍も乗る！" : cond==="sturdy"||cond==="robust" ? "。頑丈で耐久半額" : ""));
   }
 
   // === 工数フェーズ ===
@@ -784,7 +802,7 @@ function recommendCore(){
       if(cond==="pliant" && st.buffs.manipulation<=0 && st.cp>=48) return r("manipulation","高能率でマニピュレーションが48CP。耐久が危険なので最優先");
       if(st.buffs.manipulation<=0 && st.cp>=96) return r("manipulation","耐久が危険水域。マニピュレーションで立て直す");
       if(st.cp>=88) return r("mastersMend","耐久が危険水域。マスターズメンドで回復");
-      if(!st.tpUsed) return r("trainedPerfection","CPがない。匠の絶技で次の技を耐久消費0に");
+      // 絶技はここでは使わない（v4: 〆専用に温存。緊急消費が〆崩壊の主因だった）
     }
     if(st.buffs.muscleMemory>0){
       if(cond==="malleable" && st.durability>gwCost)
@@ -870,7 +888,8 @@ function recommendCore(){
   if(cond==="good"){
     if(st.iq>=8 && remQ <= by*1.75 && (st.buffs.greatStrides>0||st.buffs.innovation>0) && st.cp>=cpCost(A.byregot))
       return r("byregot","高品質×ビエルゴ！1.75倍が乗る最大の一撃で仕上げる");
-    if(st.cp < 180 && remQ > by*1.75) return r("tricks","高品質だがCPが〆予算（GS＋ビエルゴ＋祈り≒180）を割りそう。ここは秘訣で+20回収");
+    // v4: 秘訣(+20)は集中加工(約2,700品質)より弱いトレード。本当にCPが底の時だけ
+    if(st.cp < 60 && remQ > by*1.75) return r("tricks","高品質だがCPが底。秘訣で+20回収してビエルゴ資金に");
     if(st.cp>=cpCost(A.preciseTouch)) return r("preciseTouch","高品質は集中加工（150%×1.75、IQ+2）。品質/CP効率が全技で最強");
     return r("tricks","集中加工すら撃てない。秘訣でCP+20回収");
   }
@@ -900,7 +919,6 @@ function recommendCore(){
   if(st.durability<=5 || (st.durability<=10 && st.buffs.manipulation<=0)){
     if(cond==="pliant" && st.cp>=48) return r("manipulation","高能率でマニピュレーション48CP");
     if(st.buffs.manipulation<=0 && st.cp>=96+50) return r("manipulation","耐久が危険水域。マニピュレーションで立て直す");
-    if(!st.tpUsed) return r("trainedPerfection","匠の絶技で次の技を耐久消費0に（CP節約）");
     if(st.cp>=112+30) return r("immaculateMend","パーフェクトメンドで耐久全回復");
     if(st.cp>=88+30) return r("mastersMend","マスターズメンドで耐久回復");
   }
@@ -949,6 +967,11 @@ function recommendCore(){
   }
   if(!st.qiUsed && st.cp<50 && st.iq>=6) return r("quickInnovation","CP切れ間際。クイックイノベーション→ビエルゴの非常口");
   if(st.iq>=1 && st.cp>=cpCost(A.byregot) && st.durability>10) return r("byregot","CPが尽きる前にビエルゴで品質を出し切る");
+  // CPゼロ圏の0CP技フォールバック（v4）: carefulSynth(7CP)すら打てない時に手詰まりにならない
+  if(st.cp < cpCost(A.carefulSynth)){
+    if(st.durability > durCost(A.hastyTouch)) return r("hastyTouch","CPゼロ圏。0CPのヘイスティで品質を拾い続ける");
+    if(st.durability > durCost(A.rapidSynth)) return r("rapidSynth","CPも耐久も残りわずか。0CPの突貫で完成に賭ける");
+  }
   // 万策尽きた: 完走しても品質未達
   return r("carefulSynth","CP切れで品質31500に届かない。実戦なら見切って作り直し（練習として完成まで進めてもOK）");
 }
