@@ -823,6 +823,7 @@ function recommendCore(){
   if(cond==="good"){
     if(st.iq>=8 && remQ <= by*1.75 && (st.buffs.greatStrides>0||st.buffs.innovation>0) && st.cp>=cpCost(A.byregot))
       return r("byregot","高品質×ビエルゴ！1.75倍が乗る最大の一撃で仕上げる");
+    if(st.cp < 180 && remQ > by*1.75) return r("tricks","高品質だがCPが〆予算（GS＋ビエルゴ＋祈り≒180）を割りそう。ここは秘訣で+20回収");
     if(st.cp>=cpCost(A.preciseTouch)) return r("preciseTouch","高品質は集中加工（150%×1.75、IQ+2）。品質/CP効率が全技で最強");
     return r("tricks","集中加工すら撃てない。秘訣でCP+20回収");
   }
@@ -874,8 +875,6 @@ function recommendCore(){
     if(st.buffs.wasteNot>0) return r(st.lastAction==="basicTouch"?"refinedTouch":"basicTouch","倹約中は倹約加工が使えない。加工→洗練加工コンボでIQを積む(洗練はIQ+2)");
     if(st.buffs.innovation<=0 && st.iq>=2 && st.cp>=18+50) return r("innovation","イノベーションを維持して加工1回あたりの品質を1.5倍に");
     if(st.cp>=cpCost(A.prudentTouch) && st.durability>5) return r("prudentTouch","倹約加工で耐久5のままIQを積む（基本形）");
-    if(st.coLeft>0) return r("carefulObservation","CPが苦しい。設計変更で高品質（秘訣/集中加工）か高能率を釣る");
-    if(!st.hsUsed) return r("heartAndSoul","一心不乱→秘訣でCPを回収する非常口");
     if(st.hsActive) return r("tricks","一心不乱が有効。秘訣でCP+20");
     if(st.durability>durCost(A.hastyTouch)) return r("hastyTouch","CPが尽きた。ヘイスティタッチ(CP0・成功率60%)でIQガチャ。成功すればデアリングも");
   } else {
@@ -888,8 +887,7 @@ function recommendCore(){
     }
     if(st.buffs.greatStrides<=0 && st.buffs.innovation>0 && remQ > by && remQ <= by*4 && st.cp>=32+24+21)
       return r("greatStrides","素のビエルゴでは届かない。グレストを張って高品質(1.75倍)ビエルゴを祈る");
-    if(cond==="normal" && st.coLeft>0 && remQ > by*1.2 && st.buffs.innovation>0) return r("carefulObservation","設計変更で高品質を釣る（IQ10×イノベの集中加工は一撃2200超）");
-    if(!st.hsUsed && remQ > by*1.2 && st.buffs.innovation>0 && st.cp>=cpCost(A.preciseTouch)+24) return r("heartAndSoul","一心不乱で集中加工を解禁（イノベ込みで一撃1500超）");
+    // 設計変更と一心不乱は終盤のGS祈り用に温存する（中盤で薦めない）— 2026-08-16の実戦ログ反省より
     if(st.hsActive && st.cp>=cpCost(A.preciseTouch)) return r("preciseTouch","一心不乱が有効。集中加工で大きく品質を積む");
     if(st.buffs.innovation>0 && st.cp>=cpCost(A.trainedFinesse)+24) return r("trainedFinesse","イノベ中に匠の神業（耐久0）で品質を積む");
     if(st.buffs.innovation<=0 && !st.qiUsed) return r("quickInnovation","CPが細い。クイックイノベーション(0CP)でイノベを乗せる");
