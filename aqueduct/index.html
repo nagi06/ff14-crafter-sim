@@ -135,9 +135,9 @@
     <b style="color:var(--warn)">使い方:</b> ①下でマクロ生成→ゲームで実行 ②終わったら「製作」タブの<b style="color:var(--accent2)">リカバリー入力</b>にゲームの実値を入れて同期 ③実機モードで手打ち続行</p>
   </div>
   <div class="rec-grid" style="margin-bottom:10px;">
-    <div><label>工数目標（%）<br><span style="font-size:0.6rem;">高進捗の上振れでも完成しない余白。既定80</span></label><input type="number" id="mc-progpct" value="80" min="60" max="88"></div>
+    <div><label>工数目標（%）<br><span style="font-size:0.6rem;">高進捗ターンを工数収穫に使う余白。既定70</span></label><input type="number" id="mc-progpct" value="70" min="60" max="88"></div>
     <div><label>手動用に残すCP<br><span style="font-size:0.6rem;">グレスト祈り・ビエルゴ・〆の予算。既定260</span></label><input type="number" id="mc-reserve" value="260" min="100" max="500"></div>
-    <div style="grid-column:1/3;"><label style="display:flex; align-items:center; gap:6px; font-size:0.75rem;"><input type="checkbox" id="mc-quality" checked style="width:18px;height:18px;">IQ積み（倹約加工）もマクロに含める（CP予算内で自動調整）</label></div>
+    <div style="grid-column:1/3;"><label style="display:flex; align-items:center; gap:6px; font-size:0.75rem;"><input type="checkbox" id="mc-quality" style="width:18px;height:18px;">IQ積み（倹約加工）もマクロに含める ※既定オフ: IQは手動フェーズの状態収穫（下地/集中/ヘイスティ）で積む方がCP効率が良い</label></div>
   </div>
   <button onclick="buildOpeningMacro()" style="width:100%; padding:12px 0; border:none; border-radius:10px; background:var(--accent); color:#1a1408; font-weight:700; font-size:0.95rem;">前半マクロを生成</button>
   <div id="macroOut" style="margin-top:12px;"></div>
@@ -145,10 +145,6 @@
 
 <!-- ============ 製作ページ ============ -->
 <div id="page-sim" class="page active">
-  <div class="mode-tabs">
-    <button id="mode-practice" class="on" onclick="setMode(false)">練習モード（状態は自動抽選）</button>
-    <button id="mode-follow" onclick="setMode(true)">実機モード（状態を入力）</button>
-  </div>
   <div id="resultBox" class="result"></div>
 
   <div class="bars">
@@ -313,7 +309,7 @@
     <li>デフォルトは<b>コスモツール最終（スターズ: 作業+1842/加工+976/CP+8）＋防具新式</b>想定: 作業精度5779 → 100%効率あたり進捗323、加工精度5502 → 品質340、CP657（設定タブで変更可、食事薬のCPも反映）</li>
     <li>コスモツールの特殊効果<b>「高品質」時の品質上昇量1.75倍</b>（通常道具は1.5倍）を品質計算・おすすめ・勝算判定に反映済み。新式装備で挑む場合は<a href="../shinshiki/">新式版</a>を使うこと</li>
     <li>出る状態は【通常・高品質・高進捗・高能率・頑丈・頑強・安定・長持続】の8種のみ。<b>最高品質・不調・良兆候は高難度レシピでは出ない</b>（検証者のリストと仕様解説で確認済み）。頑強（耐久半減＋次ターン必ず頑丈）は実プレイで確認済み</li>
-    <li>状態変化の出現率は<b>推定値</b>（高品質14% / 高進捗10% / 高能率14% / 頑丈11% / 頑強4% / 安定10% / 長持続12% / 通常25%、頑強の翌ターンは必ず頑丈）。実測と多少ズレる可能性あり。実際にプレイして「高品質がもっと出る」等が分かったら、このファイル内の CONDITIONS の数値を直せば精度が上がる</li>
+    <li>状態変化の出現率は<b>実機ミラー実測ベース</b>（2026-08-18・部材48T/44サンプル: 頑丈17% / 頑強10% / 高品質10% / 高進捗9% / 高能率14% / 安定10% / 長持続9% / 通常21%、頑強の翌ターンは必ず頑丈）。<b>頑丈系がターンの4割前後</b>、高品質は旧推定の半分。サンプルが増えたら CONDITIONS の数値を更新して精度を上げる</li>
     <li>「おすすめ」はあくまで<b>判断の目安</b>。機械的におすすめだけを追った自動テストでは完走成功率は数%だった（惜敗2.9万台が多数）。状態の引きに合わせた人間の判断——特にビエルゴを撃つ/待つの見極め——で上積みするのが本番</li>
   </ul>
 </div>
@@ -344,16 +340,19 @@ const RECIPE = {
   requiredCraftsmanship: 5620,
 };
 
-/* ========= 状態変化定義（出現率は既存エキスパートからの推定） ========= */
+/* ========= 状態変化定義 =========
+   出現率は2026-08-18の実機ミラー実測（部材48T・44サンプル）を旧推定とブレンドした値。
+   実測: 頑強16%・頑丈20%・高品質7%・高進捗7%・通常23%・高能率14%・安定11%・長持続9%
+   → 頑丈系がターンの4割前後（頑強翌の確定頑丈込み）。高品質は旧推定の半分しか出ない */
 const CONDITIONS = {
-  normal:    {name:"通常",   color:"#c8ccd8", p:0.25, desc:"特別な効果はない"},
-  good:      {name:"高品質", color:"#e85d5d", p:0.14, desc:"品質1.75倍（コスモツール効果） ／ 秘訣・集中加工・集中作業が使える"},
-  malleable: {name:"高進捗", color:"#7ec8f0", p:0.10, desc:"進捗1.5倍 ／ 作業系を撃つチャンス"},
+  normal:    {name:"通常",   color:"#c8ccd8", p:0.21, desc:"特別な効果はない"},
+  good:      {name:"高品質", color:"#e85d5d", p:0.10, desc:"品質1.75倍（コスモツール効果） ／ 秘訣・集中加工・集中作業が使える"},
+  malleable: {name:"高進捗", color:"#7ec8f0", p:0.09, desc:"進捗1.5倍 ／ 作業系を撃つチャンス"},
   pliant:    {name:"高能率", color:"#8de0a8", p:0.14, desc:"CP消費が半分 ／ 重いバフを撃つチャンス"},
-  sturdy:    {name:"頑丈",   color:"#6a8ff0", p:0.11, desc:"耐久消費が半分 ／ 耐久10の技を撃つチャンス"},
-  robust:    {name:"頑強",   color:"#3f6ce0", p:0.04, desc:"耐久消費が半分＋次ターンは必ず頑丈（半減2連チャンス）"},
+  sturdy:    {name:"頑丈",   color:"#6a8ff0", p:0.17, desc:"耐久消費が半分 ／ 耐久10の技を撃つチャンス"},
+  robust:    {name:"頑強",   color:"#3f6ce0", p:0.10, desc:"耐久消費が半分＋次ターンは必ず頑丈（半減2連チャンス）"},
   centered:  {name:"安定",   color:"#f0e06a", p:0.10, desc:"成功率+25%（突貫作業などに影響）"},
-  primed:    {name:"長持続", color:"#c98fe8", p:0.12, desc:"このターンに使ったバフの持続+2"},
+  primed:    {name:"長持続", color:"#c98fe8", p:0.09, desc:"このターンに使ったバフの持続+2"},
 };
 function isGoodish(c){ return c==="good"; }
 
@@ -439,15 +438,13 @@ const A = Object.fromEntries(ACTIONS.map(a=>[a.id,a]));
 /* ========= 製作状態 ========= */
 let st = null;
 let undoStack = [];
-let followMode = false;   // 実機モード: 状態変化・突貫の成否を手入力
+let followMode = true;    // 実機モード固定（練習モード＝状態自動抽選は廃止。2026-08-17）
 let pendingRapid = null;  // 実機モードで突貫の結果待ち
 let forcedRoll = null;    // 突貫の成否を外から与えるとき用
 
 function setMode(follow){
-  followMode = follow;
+  followMode = true; // 実機モード固定
   pendingRapid = null;
-  document.getElementById("mode-practice").classList.toggle("on", !follow);
-  document.getElementById("mode-follow").classList.toggle("on", follow);
   render();
 }
 function pickCondition(k){
@@ -719,7 +716,9 @@ function finishCraft(condKey, a, gp, gq){
 }
 
 function pushHist(condKey, act, detail){
-  st.history.unshift({step:st.step, cond:condKey, act, detail});
+  // 実行後の盤面スナップショット付き（履歴行をそのままコピペで相談できるように）
+  const snap = `工数${st.progress} 品質${st.quality} 耐久${st.durability} CP${st.cp} IQ${st.iq}`;
+  st.history.unshift({step:st.step, cond:condKey, act, detail, snap});
 }
 
 /* ========= おすすめエンジン（ヒューリスティック） ========= */
@@ -783,20 +782,71 @@ function recommendCore(){
   if(!progDone){
     const gwCost = durCost(A.groundwork);
     // 耐久維持を最優先（残り耐久が下地1回分を切ったら手当て）
-    if(st.durability<=12 && st.buffs.muscleMemory<=0){
+    // マニピュ稼働中で耐久5技が生きているなら「緊急」ではない（T7メンド事件の再発防止）
+    if(st.durability<=12 && st.buffs.muscleMemory<=0 && !(st.buffs.manipulation>0 && st.durability>5)){
       if(cond==="pliant" && st.buffs.manipulation<=0 && st.cp>=48) return r("manipulation","高能率でマニピュレーションが48CP。耐久が危険なので最優先");
       if(st.buffs.manipulation<=0 && st.cp>=96) return r("manipulation","耐久が危険水域。マニピュレーションで立て直す");
       if(st.cp>=88) return r("mastersMend","耐久が危険水域。マスターズメンドで回復");
       if(!st.tpUsed) return r("trainedPerfection","CPがない。匠の絶技で次の技を耐久消費0に");
     }
     if(st.buffs.muscleMemory>0){
+      if(cond==="malleable" && st.durability>gwCost)
+        return r("groundwork","高進捗×確信は×3.0！ヴェネを待たずここで下地作業を撃つのが最大値");
       if(st.buffs.veneration<=0 && st.cp>=18) return r("veneration","確信バフが残っているうちにヴェネレーションを掛けて下地作業に繋ぐ");
       if(st.durability>gwCost) return r("groundwork","確信＋ヴェネレーションが乗るうちに下地作業で大きく進める"+(cond==="malleable"?"（高進捗でさらに1.5倍！）":""));
       return r("carefulSynth","耐久が心もとないので模範作業で確実に（確信は乗る）");
     }
-    if(cond==="good" && st.cp>=cpCost(A.intensiveSynth)) return r("intensiveSynth","高品質なので集中作業（効率400%）で工数を稼ぐ");
-    if(cond==="malleable") return r(st.durability>gwCost+10?"groundwork":"carefulSynth","高進捗(+50%)。作業系で一気に進める");
-    if(cond==="pliant" && st.buffs.manipulation<=0 && st.durability<=45 && st.cp>=48) return r("manipulation","高能率でマニピュレーションが48CP。工数フェーズの耐久を支える");
+    // === 状態収穫スタイル（前半マクロ後の中間状態） ===
+    // 工数は高進捗ターンで稼ぎ、頑丈/頑強・高品質・通常は品質とIQの収穫に回す（80%時代のヴェネ連打はしない）
+    if(cond==="malleable"){
+      if(st.durability>gwCost+10 && remP > progGain(A.groundwork)+400)
+        return r("groundwork","高進捗(+50%)は工数収穫の本命。下地作業で一気に進める");
+      if(remP > progGain(A.carefulSynth)+100) return r("carefulSynth","高進捗(+50%)。模範作業で進める（下地だと完成圏か耐久難）");
+      return r("basicSynth","高進捗だが模範作業だと完成してしまう位置。作業(120%)で刻む");
+    }
+    if(cond==="good"){
+      if(remQ>0 && st.cp>=cpCost(A.preciseTouch) && st.durability>durCost(A.preciseTouch))
+        return r("preciseTouch","高品質は集中加工(150%×1.75・IQ+2)で収穫。工数は高進捗ターンに回す");
+      return r("tricks","高品質だがCP/耐久が細い。秘訣でCP+20回収");
+    }
+    if((cond==="sturdy"||cond==="robust") && st.buffs.wasteNot<=0 && st.durability>10){
+      if(st.iq<=8 && st.cp>=cpCost(A.preparatoryTouch) && st.durability>durCost(A.preparatoryTouch))
+        return r("preparatoryTouch", cond==="robust"
+          ? "頑強は次ターンも頑丈確定。下地加工(耐久10で200%＋IQ+2)を2連打で収穫"
+          : "頑丈は下地加工が耐久10で200%＋IQ+2。品質収穫のチャンス");
+      if(st.iq<10 && st.cp>=cpCost(A.basicTouch))
+        return r(st.lastAction==="basicTouch"?"refinedTouch":"basicTouch","頑丈系は耐久10の技が5で済む。加工→洗練加工でIQを積む");
+      if(st.iq>=10 && st.cp>=cpCost(A.delicateSynth) && st.durability>durCost(A.delicateSynth))
+        return r("delicateSynth","IQ10の頑丈系は精密作業(耐久5で工数150%＋品質同時)。両取りで残工数も削る");
+    }
+    if(cond==="pliant" && st.buffs.manipulation<=1 && st.durability<=45 && st.cp>=48) return r("manipulation","高能率でマニピュレーションが48CP。残1Tを待たず張り直すのが耐久規律");
+    if(cond==="primed" && st.buffs.manipulation<=1 && st.durability<=40 && st.cp>=96+75)
+      return r("manipulation","長持続でマニピュ10ターン持続。切れる前の張り直しが耐久崩壊の予防線");
+    if(cond==="pliant" && st.iq>=10 && st.buffs.innovation<=0 && st.cp>=9)
+      return r("innovation","高能率でイノベーションが9CP。IQ10の品質サイクルを半額で始動");
+    if(cond==="pliant" && st.durability>5 && st.cp>=cpCost(A.prudentTouch))
+      return r("prudentTouch","高能率で倹約加工13CP。"+(st.iq<10?"お得にIQを積む":"イノベに乗せて品質収穫"));
+    if(st.iq<10 && st.buffs.wasteNot>0 && st.durability>5 && st.cp>=18)
+      return r(st.lastAction==="basicTouch"?"refinedTouch":"basicTouch","倹約中は倹約加工が使えない。加工→洗練加工でIQを積む");
+    if(st.iq<10 && st.buffs.wasteNot<=0 && st.durability>5 && st.cp>=cpCost(A.prudentTouch))
+      return r("prudentTouch","通常系ターンは倹約加工(耐久5)でIQ収穫。工数は高進捗ターンで稼ぐ");
+    // IQ10以降の品質サイクル（工数は高進捗と〆コンボに任せる。CPは〆予算を残す）
+    if(st.iq>=10 && st.buffs.innovation<=0 && st.cp>=18+56)
+      return r("innovation","IQ10。イノベーションを張って品質サイクル(タッチ1.5倍)へ");
+    if(st.buffs.expedience>0 && st.durability>durCost(A.daringTouch))
+      return r("daringTouch","ヘイスティ成功の勢い！デアリングタッチ(CP0・150%)はタダで振れる大サイコロ");
+    // コンボ・ドクトリン(2026-08-17): CPが潤沢なら加工→中級→上級コンボ(各18CP)が品質単価最強(約72品質/CP)。
+    // ヘイスティはCPが細った時の代替。フル手打ちでは制約資源はCPでなく耐久＝マニピュ/メンド投資を惜しまない
+    if(st.iq>=10 && st.buffs.innovation>0 && st.cp>=140 && st.durability>durCost(A.basicTouch)){
+      if(st.lastAction==="basicTouch") return r("standardTouch","コンボで中級加工18CP(125%)。三段コンボが品質単価最強");
+      if(st.lastAction==="standardTouch") return r("advancedTouch","コンボ〆の上級加工18CP(150%)");
+      return r("basicTouch","コンボ始動の加工18CP。中級→上級と繋いで約72品質/CPを回す");
+    }
+    if(st.iq>=10 && st.buffs.innovation>0 && (st.buffs.manipulation>0 ? st.durability>10 : st.durability>20))
+      return r("hastyTouch","CPが細い。ヘイスティ(CP0・60%)で耐久を品質に変換して残CPは集中加工・ビエルゴ・〆へ");
+    if(st.iq>=10 && st.buffs.innovation>0 && st.buffs.wasteNot<=0 && st.durability>5 && st.cp>=cpCost(A.prudentTouch)+50)
+      return r("prudentTouch","耐久が細くヘイスティは危険。倹約加工(耐久5)で品質収穫");
+    // ここから下は従来の工数押し込み（IQが積み上がった後・高進捗が来ないときの締め）
     if(st.buffs.veneration<=0 && remP>careful*4 && st.cp>=18) return r("veneration","工数がまだ長い。ヴェネレーションを掛け直す");
     if(st.durability>15 && remP > progGain(A.rapidSynth)+400)
       return r("rapidSynth","CP0の突貫作業で耐久あたりの進捗を稼ぐ（CP温存が生命線）。当たっても完成しない位置"+(cond==="centered"?"（安定で成功率75%！）":"（成功率50%）"));
@@ -843,7 +893,7 @@ function recommendCore(){
   }
   // 高能率: 重いものを半額で
   if(cond==="pliant"){
-    if(st.buffs.manipulation<=0 && st.durability<=40 && st.cp>=48) return r("manipulation","高能率でマニピュレーションが48CP。耐久管理の柱");
+    if(st.buffs.manipulation<=1 && st.durability<=40 && st.cp>=48) return r("manipulation","高能率でマニピュレーションが48CP。残1Tを待たず張り直すのが耐久規律");
     if(st.durability<=15 && st.cp>=56) return r("immaculateMend","高能率でパーフェクトメンド56CP。耐久全回復");
     if(st.buffs.innovation<=0 && st.iq>=6 && st.cp>=9) return r("innovation","高能率でイノベーション9CP");
     if(st.iq<10 && st.durability>5 && st.cp>=13) return r("prudentTouch","高能率で倹約加工が13CP。お得にIQを積む");
@@ -867,7 +917,7 @@ function recommendCore(){
   }
   // 長持続: バフを伸ばす
   if(cond==="primed"){
-    if(st.buffs.manipulation<=0 && st.cp>=96+50 && st.durability<=40) return r("manipulation","長持続でマニピュレーションが10ターン持続");
+    if(st.buffs.manipulation<=1 && st.cp>=96+50 && st.durability<=40) return r("manipulation","長持続でマニピュレーションが10ターン持続。切れる前に張り直す");
     if(st.buffs.innovation<=0 && st.iq>=6 && st.cp>=18+50) return r("innovation","長持続でイノベーション6ターン。加工を重ねる");
   }
   // IQ積み基本形（イノベーションを維持しながら倹約加工）
@@ -889,6 +939,13 @@ function recommendCore(){
       return r("greatStrides","素のビエルゴでは届かない。グレストを張って高品質(1.75倍)ビエルゴを祈る");
     // 設計変更と一心不乱は終盤のGS祈り用に温存する（中盤で薦めない）— 2026-08-16の実戦ログ反省より
     if(st.hsActive && st.cp>=cpCost(A.preciseTouch)) return r("preciseTouch","一心不乱が有効。集中加工で大きく品質を積む");
+    if(st.buffs.innovation>0 && st.cp>=140 && st.durability>durCost(A.basicTouch)){
+      if(st.lastAction==="basicTouch") return r("standardTouch","コンボで中級加工18CP(125%)");
+      if(st.lastAction==="standardTouch") return r("advancedTouch","コンボ〆の上級加工18CP(150%)");
+      return r("basicTouch","コンボ始動の加工18CP。中級→上級と繋いで品質単価最強を回す");
+    }
+    if(st.buffs.innovation>0 && (st.buffs.manipulation>0 ? st.durability>10 : st.durability>20))
+      return r("hastyTouch","CPが細い。イノベ中のヘイスティ(CP0・60%)で耐久を品質に変換");
     if(st.buffs.innovation>0 && st.cp>=cpCost(A.trainedFinesse)+24) return r("trainedFinesse","イノベ中に匠の神業（耐久0）で品質を積む");
     if(st.buffs.innovation<=0 && !st.qiUsed) return r("quickInnovation","CPが細い。クイックイノベーション(0CP)でイノベを乗せる");
     if(st.cp<32 && st.durability>durCost(A.hastyTouch)) return r("hastyTouch","CP切れ。ヘイスティタッチ(CP0・60%)のガチャで品質を拾う");
@@ -994,7 +1051,7 @@ function applyRecovery(){
   st.condition = document.getElementById("rec-cond").value;
   st.awaitCond = false;
   st.finished = false; st.failed = false; st.resultText = "";
-  st.history.unshift({step:st.step, cond:st.condition, act:"リカバリー入力", detail:`工数${st.progress} 品質${st.quality} 耐久${st.durability} CP${st.cp}`});
+  pushHist(st.condition, "リカバリー入力", "");
   document.getElementById("recPanel").style.display = "none";
   render();
 }
@@ -1114,13 +1171,16 @@ function render(){
     rb.className = "result";
   }
 
+  // 自動保存（リロード・パッチ適用しても製作状態と履歴が残るように）
+  try{ localStorage.setItem("aqueduct-autosave", JSON.stringify({st, followMode})); }catch(e){}
+
   // 履歴
   const hb = document.getElementById("historyBox");
   if(st.history.length===0){ hb.textContent = "ここに履歴が表示されます"; }
   else {
     hb.innerHTML = st.history.map(h=>{
       const cc = CONDITIONS[h.cond];
-      return `<div>T${h.step} <span class="h-cond" style="color:${cc.color}">[${cc.name}]</span> <span class="h-act">${h.act}</span> <span>${h.detail}</span></div>`;
+      return `<div>T${h.step} <span class="h-cond" style="color:${cc.color}">[${cc.name}]</span> <span class="h-act">${h.act}</span> <span>${h.detail}</span>${h.snap?` <span style="opacity:.75">｜${h.snap}</span>`:""}</div>`;
     }).join("");
   }
   document.getElementById("undoBtn").disabled = undoStack.length===0;
@@ -1161,7 +1221,7 @@ let lastMacroPlan = null;
 function buildOpeningMacro(){
   readSettings();
   const bp = baseProg(), bq = baseQual(), cpMax = maxCP();
-  const pct = Math.max(60, Math.min(88, +document.getElementById("mc-progpct").value || 80));
+  const pct = Math.max(60, Math.min(88, +document.getElementById("mc-progpct").value || 70));
   const reserve = Math.max(100, Math.min(500, +document.getElementById("mc-reserve").value || 260));
   const withQ = document.getElementById("mc-quality").checked;
   const target = Math.floor(RECIPE.difficulty * pct / 100);
@@ -1258,6 +1318,14 @@ function applyMacroPlan(){
 /* 起動 */
 readSettings();
 st = newState();
+// 自動保存があれば製作途中の状態を復元（「最初から」ボタンで破棄して新規開始）
+try{
+  const saved = JSON.parse(localStorage.getItem("aqueduct-autosave") || "null");
+  if(saved && saved.st && !saved.st.finished && (saved.st.step > 1 || saved.st.history.length > 0)){
+    st = saved.st;
+    if(saved.followMode) setMode(true);
+  }
+}catch(e){}
 render();
 </script>
 </body>
