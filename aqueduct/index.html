@@ -906,6 +906,10 @@ function assess(){
   const remP = RECIPE.difficulty - st.progress;
   const remQ = RECIPE.requiredQuality - st.quality;
   if(remQ<=0) return {lv:"ok", head:"品質達成", text:"あとは模範作業で完成させるだけ。事故らないように"};
+  // 序盤は簡易モデルの精度が出ない（高品質集中加工・秘訣収入・設計変更・1.75倍ビエルゴを数えないため
+  // 常に悲観に振れる）。CPが十分あるうちは判定を保留する
+  if(st.cp > 320 && remQ > 12000)
+    return {lv:"pray", head:"評価保留（まだ判定できない）", text:"序盤〜中盤は簡易モデルが悲観側に出ます。CPが320を切るあたりから勝算判定が意味を持ちます。高品質の拾いと秘訣回収に集中を"};
 
   // 工数を終わらせるコスト（模範作業換算）
   const nProg = Math.max(0, Math.ceil(remP / Math.floor(baseProg()*1.8)));
