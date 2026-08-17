@@ -1169,7 +1169,7 @@ function buildOpeningMacro(){
   const doA = (n, c, du, gainP, gainQ)=>{
     acts.push(n); cp += c;
     if(du > 0) d -= du;
-    if(gainP) cum += gainP;
+    if(gainP){ cum += gainP; if(n !== "確信" && mm > 0) mm = 0; } // 確信バフは最初の作業1回で消費（練習モード実測で検証済み）
     if(gainQ) qsum += gainQ;
     if(n !== "マニピュレーション" && manip > 0 && d > 0){ d = Math.min(RECIPE.durability, d + 5); manip--; }
     if(n !== "ヴェネレーション" && vene > 0) vene--;
