@@ -316,14 +316,11 @@
 
 <!-- ============ 設定ページ ============ -->
 <div id="page-set" class="page">
-  <div class="set-row"><label>作業精度<span class="hint">必要値5620。デフォルトはスターズ実測（証込み・飯薬なし 2026-08-15）</span></label><input type="number" id="in-craft" value="5799"></div>
-  <div class="set-row"><label>加工精度<span class="hint">食事込みの実数値（スターズ＋アリペブレHQ実測5637。素は5522）</span></label><input type="number" id="in-control" value="5637"></div>
-  <div class="set-row"><label>CP（装備のみ）<span class="hint">キャラ画面の素の値（スターズ実測664）</span></label><input type="number" id="in-cp" value="664"></div>
-  <div class="set-row"><label>食事のCPボーナス<span class="hint">アリペブレHQ想定（薬と合計で+127になるよう調整）</span></label><input type="number" id="in-foodcp" value="106"></div>
-  <div class="set-row"><label>薬のCPボーナス<span class="hint">魔匠の薬液など（概算+21）</span></label><input type="number" id="in-potcp" value="21"></div>
-  <div class="set-row"><label>食事・薬を使う</label><input type="checkbox" id="in-usefood" checked></div>
-  <div class="set-row"><label>マイスター補正 +20/+20/+15<span class="hint">上のステータスが装備ページの値（証なし）ならON。ゲーム内キャラ画面の実測値（証込み）を入れたならOFF。既定はスターズ実測（証込み）なのでOFF</span></label><input type="checkbox" id="in-meister"></div>
-  <p class="apply-note">※ 変更は「最初から」を押した次の製作から反映されます。作業/加工精度に食事分が付く場合はゲーム内のキャラクター画面の実数値をそのまま入れてください。</p>
+  <div class="set-row"><label>作業精度（実効値）<span class="hint">飯・薬・マイスター全部込みの実数値をそのまま。必要値5620。既定はスターズ実測（証込み 2026-08-15）</span></label><input type="number" id="in-craft" value="5799" oninput="updateBaseline()"></div>
+  <div class="set-row"><label>加工精度（実効値）<span class="hint">全部込みの実数値をそのまま（スターズ＋アリペブレHQ実測5637。素は5522）</span></label><input type="number" id="in-control" value="5637" oninput="updateBaseline()"></div>
+  <div class="set-row"><label>開始CP（実効値）<span class="hint">製作画面のCP最大値をそのまま（スターズ実測: 装備664＋飯106＋薬21＝791）</span></label><input type="number" id="in-cp" value="791" oninput="updateBaseline()"></div>
+  <div class="set-row"><label>スタートライン<span class="hint">上3つから自動計算。製作画面の表示と一致していれば入力OK</span></label><div id="set-baseline" style="font-size:0.9rem; font-weight:700;"></div></div>
+  <p class="apply-note">※ 3欄とも飯・薬・マイスター込みで「ゲーム画面に出ている実数値」を入れる（作業/加工＝キャラ画面、CP＝製作画面の最大値）。個別ボーナス欄は廃止。変更は「最初から」を押した次の製作から反映されます。</p>
 </div>
 </main>
 
@@ -357,11 +354,11 @@ const CONDITIONS = {
 function isGoodish(c){ return c==="good"; }
 
 /* ========= プレイヤー設定 ========= */
-// コスモツール最終（スターズ: 作業+1842/加工+976/CP+8）＋防具は新式想定のデフォルト
-let player = { craft:5799, control:5637, cp:664, foodCp:106, potCp:21, useFood:true, meister:false };
-function effCraft(){ return player.craft + (player.meister?20:0); }
-function effControl(){ return player.control + (player.meister?20:0); }
-function maxCP(){ return player.cp + (player.meister?15:0) + (player.useFood ? player.foodCp + player.potCp : 0); }
+// 全て実効値（飯・薬・マイスター込みの画面実数値）。スターズ実測: 5799/5637/CP791(=装備664+飯106+薬21) 2026-08-15
+let player = { craft:5799, control:5637, cp:791 };
+function effCraft(){ return player.craft; }
+function effControl(){ return player.control; }
+function maxCP(){ return player.cp; }
 function baseProg(){ return Math.floor(effCraft()*10/RECIPE.progressDivider + 2); }
 function baseQual(){ return Math.floor(effControl()*10/RECIPE.qualityDivider + 35); }
 
@@ -1202,12 +1199,18 @@ function resetCraft(){
 }
 function readSettings(){
   player.craft = +document.getElementById("in-craft").value || 5799;
-  player.control = +document.getElementById("in-control").value || 5522;
-  player.cp = +document.getElementById("in-cp").value || 664;
-  player.foodCp = +document.getElementById("in-foodcp").value || 0;
-  player.potCp = +document.getElementById("in-potcp").value || 0;
-  player.useFood = document.getElementById("in-usefood").checked;
-  player.meister = document.getElementById("in-meister").checked;
+  player.control = +document.getElementById("in-control").value || 5637;
+  player.cp = +document.getElementById("in-cp").value || 791;
+}
+function updateBaseline(){
+  // 表示専用。playerは触らない（反映は従来通り「最初から」のreadSettings）
+  const c = +document.getElementById("in-craft").value || 5799;
+  const k = +document.getElementById("in-control").value || 5637;
+  const cp = +document.getElementById("in-cp").value || 791;
+  const bp = Math.floor(c*10/RECIPE.progressDivider + 2);
+  const bq = Math.floor(k*10/RECIPE.qualityDivider + 35);
+  const el = document.getElementById("set-baseline");
+  if(el) el.textContent = `開始CP ${cp} ／ 工数100%＝${bp} ／ 品質100%＝${bq}（IQ0素点）`;
 }
 function showPage(p){
   for(const x of ["macro","sim","guide","set"]){
@@ -1317,6 +1320,7 @@ function applyMacroPlan(){
 
 /* 起動 */
 readSettings();
+updateBaseline();
 st = newState();
 // 自動保存があれば製作途中の状態を復元（「最初から」ボタンで破棄して新規開始）
 try{

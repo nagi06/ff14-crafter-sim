@@ -67,8 +67,8 @@ function transformSource(src) {
 // readSettings() がどこで呼ばれても正しい player になるようにする。
 const PRELUDE = `"use strict";
 var __elemCache = Object.create(null);
-var __presetValues = { "in-craft": "5799", "in-control": "5637", "in-cp": "664", "in-foodcp": "106", "in-potcp": "21" };
-var __presetChecked = { "in-usefood": true, "in-meister": false };
+var __presetValues = { "in-craft": "5799", "in-control": "5637", "in-cp": "791" }; // 実効値直接入力方式（2026-08-18改修）
+var __presetChecked = {};
 function __makeElem(id) {
   return {
     id: id,
