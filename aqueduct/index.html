@@ -115,7 +115,7 @@
 </head>
 <body>
 <header>
-  <h1>ルインド・アクアダクト中間素材 製作支援・進化版 <span id="app-ver" style="font-size:0.78em; font-weight:700; color:var(--accent); border:1px solid var(--accent); border-radius:8px; padding:1px 9px; vertical-align:middle; white-space:nowrap;">v6.2</span></h1>
+  <h1>ルインド・アクアダクト中間素材 製作支援・進化版 <span id="app-ver" style="font-size:0.78em; font-weight:700; color:var(--accent); border:1px solid var(--accent); border-radius:8px; padding:1px 9px; vertical-align:middle; white-space:nowrap;">v6.3</span></h1>
   <!-- ※ app-ver はパッチのたびに手で上げる（コミットとセットで）。リロードでこの数字が変われば更新が来た合図 -->
   <div class="sub">部材/金属材/錬金樹脂 共通レシピ(rlvl776) 工数11250 / 品質31520 / 耐久60 ｜ 完成ライン品質31500 ｜ 前半マクロ＋後半手打ちのハイブリッド運用対応</div>
   <div class="tabs">
@@ -745,7 +745,8 @@ function wouldDie(id){
   if(a.type!=="synth") return true;
   if(a.successRate!==undefined) return true; // 突貫は外れたら即死なので賭けない
   const gain = progGain(a, a.id==="groundwork" && st.durability<d ? a.eff/2 : a.eff);
-  return st.progress + gain < RECIPE.difficulty;
+  // 最終確認が効いていると完成がクランプされて生還できないので、完成頼みの手も死
+  return st.buffs.finalAppraisal>0 || st.progress + gain < RECIPE.difficulty;
 }
 function recommend(){
   if(st.finished||st.failed) return null;
@@ -1311,7 +1312,10 @@ function evalSearch(s){
   const packMult = s.iq>=10 ? 1 : 0.3 + 0.07*s.iq;
   // パックはCPで払える分しか計上しない（ビエルゴ代を食い潰すとゴールごと消える構造を葉に見せる）
   const packAfford = s.cp>=goalCp ? 1 : s.cp>=56 ? 0.8 : s.cp>=24 ? (s.qiUsed?0.6:0.7) : 0;
-  const qFin = s.quality + qFromCp + packQ*packMult*packAfford;
+  // パックは耐久でもゲートする: ビエルゴ(耐久10)＋完走分の耐久が無い盤面で+3,132を数えると
+  // 「ビエルゴ死が一番マシ」に見える（実戦12本目）。メンド代込みのCPがあるなら回復見込みで許容
+  const packDurOk = (durAfterFin >= 10) || (s.cp >= goalCp + 88);
+  const qFin = s.quality + qFromCp + packQ*packMult*packAfford*(packDurOk?1:0);
   let v = Math.min(qFin, RECIPE.requiredQuality);
   if(qFin >= RECIPE.requiredQuality && durAfterFin >= 0) v += SEARCH_W.winReach; // 勝ち筋圏
   if(durAfterFin < 0) v -= (-durAfterFin)*SEARCH_W.durDebt; // 地平線の先の耐久死を葉に見せる
@@ -1380,7 +1384,9 @@ function searchStep(s, depth){
 function recommendSearch(){
   if(st.finished||st.failed) return null;
   const res = searchStep(simClone(st), SEARCH_DEPTH);
-  if(res.id && canUse(A[res.id]))
+  // wouldDie安全網: 全ラインが死ぬ詰み盤面では探索が「一番品質の高い死に方」を返すことがある
+  // （実戦12本目T43のビエルゴ即死推奨）。即死手は推奨せずv5系の見切りロジックに委ねる
+  if(res.id && canUse(A[res.id]) && !wouldDie(res.id))
     return { id: res.id, reason: `先読み${SEARCH_DEPTH}手の期待値探索（v6）で最大値の手` };
   return recommend(); // 探索が答えを出せない場合はv5ヒューリスティックに委譲
 }
