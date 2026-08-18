@@ -115,7 +115,7 @@
 </head>
 <body>
 <header>
-  <h1>ルインド・アクアダクト中間素材 製作支援・進化版 <span id="app-ver" style="font-size:0.78em; font-weight:700; color:var(--accent); border:1px solid var(--accent); border-radius:8px; padding:1px 9px; vertical-align:middle; white-space:nowrap;">v4.2</span></h1>
+  <h1>ルインド・アクアダクト中間素材 製作支援・進化版 <span id="app-ver" style="font-size:0.78em; font-weight:700; color:var(--accent); border:1px solid var(--accent); border-radius:8px; padding:1px 9px; vertical-align:middle; white-space:nowrap;">v5.1</span></h1>
   <!-- ※ app-ver はパッチのたびに手で上げる（コミットとセットで）。リロードでこの数字が変われば更新が来た合図 -->
   <div class="sub">部材/金属材/錬金樹脂 共通レシピ(rlvl776) 工数11250 / 品質31520 / 耐久60 ｜ 完成ライン品質31500 ｜ 前半マクロ＋後半手打ちのハイブリッド運用対応</div>
   <div class="tabs">
@@ -353,6 +353,11 @@ const CONDITIONS = {
   primed:    {name:"長持続", color:"#c98fe8", p:0.09, desc:"このターンに使ったバフの持続+2"},
 };
 function isGoodish(c){ return c==="good"; }
+
+/* ========= ドクトリンパラメータ ========= */
+// v5.1: 三段コンボの発動CP下限。MC実測（2026-08-18・閾値80〜999スイープ）でヘイスティ0CP+CP温存が
+// コンボより単調に強く、9999=事実上の封印が最適（勝率2.1%→6.8%）。将来の再検証用に定数として残す
+let COMBO_FLOOR = 9999;
 
 /* ========= プレイヤー設定 ========= */
 // 全て実効値（飯・薬・マイスター込みの画面実数値）。スターズ実測: 5799/5637/CP791(=装備664+飯106+薬21) 2026-08-15
@@ -758,8 +763,26 @@ function recommendCore(){
 
   const r = (id, reason)=>({id, reason});
 
+  // === v5 ゴール逆算（Chachapa式 2026-08-18導入）===
+  // 勝ち確パック: 絶技→GS→(QI/イノベ)→ビエルゴ→作業(0CP)。品質ゴール＝31,500−パック分
+  const packQ = Math.floor(Math.floor(baseQual()*2+EPS)*3*2.5+EPS); // IQ10・GS+イノベのビエルゴ
+  const goalQ = RECIPE.requiredQuality - packQ;
+  const goalCp = 32 + cpCost(A.byregot) + (st.qiUsed ? 18 : 0);
+  const progReady = remP <= Math.floor(baseProg()*1.2); // 工数「あと作業1回」
+
   // 1ターン目（真の製作開始時のみ。リカバリー入力でターン数が1のままの中間状態では出さない）
-  if(st.step===1 && st.progress===0 && st.quality===0) return r("muscleMemory","開幕は確信で進捗300%＋次の作業系を強化。工数フェーズを短く済ませるのが基本形");
+  if(st.step===1 && st.progress===0 && st.quality===0) return r("reflect","開幕は真価でIQ+2先行（v5）。工数はヴェネ→突貫(0CP)で払う");
+
+  // 勝ち確シークエンス: 品質ゴール到達＆工数リーチ＆パックCP確保 → 絶技→GS→QI→ビエルゴ→作業(0CP)
+  if(progReady && remQ>0 && st.quality>=goalQ && st.cp>=goalCp && st.iq>=10){
+    if(st.buffs.greatStrides<=0 && st.cp>=32+cpCost(A.byregot)) return r("greatStrides","勝ち確圏！GS→(QI)→ビエルゴ→作業(0CP)で決める");
+    if(st.buffs.greatStrides>0){
+      if(st.buffs.innovation<=0 && !st.qiUsed) return r("quickInnovation","勝ち確: QI(0CP)を乗せる");
+      if(st.buffs.innovation<=0 && st.cp>=18+cpCost(A.byregot)) return r("innovation","勝ち確: イノベを乗せる");
+      if(!st.tpUsed && st.durability<=durCost(A.byregot)) return r("trainedPerfection","勝ち確: 絶技でビエルゴを耐久消費0に");
+      if(st.durability>durCost(A.byregot) || st.tpReady) return r("byregot","勝ち確ビエルゴ！この後は作業(0CP)で完成");
+    }
+  }
 
   // 今ビエルゴを撃てば品質ラインに届くなら、何より優先で撃つ
   if(remQ>0 && st.iq>=1 && st.cp>=cpCost(A.byregot) && byregotNow() >= remQ && st.durability>durCost(A.byregot))
@@ -773,7 +796,9 @@ function recommendCore(){
   }
 
 
-  // 品質達成済み → 〆コンボで完成させる（v4: 模範連打は耐久が持たない。ヴェネ→(絶技)→下地で最短）
+  // 品質達成済み → 完成させる
+  if(remQ<=0 && progReady) return r("basicSynth","品質達成＋工数リーチ！作業(0CP)で完成。GG");
+  // （v5未リーチ時のフォールバック: v4の〆コンボ。ヴェネ→(絶技)→下地で最短）
   if(remQ<=0){
     const gwC = durCost(A.groundwork);
     if(remP > Math.floor(baseProg()*1.8) && st.cp>=cpCost(A.groundwork)){
@@ -796,7 +821,28 @@ function recommendCore(){
         + (cond==="good" ? "。高品質1.75倍も乗る！" : cond==="sturdy"||cond==="robust" ? "。頑丈で耐久半額" : ""));
   }
 
-  // === 工数フェーズ ===
+  // === 工数フェーズ（v5）: ヴェネ→突貫(0CP)連打で「あと作業1回」まで押し、最終確認で完成防止 ===
+  if(!progReady){
+    if(st.buffs.finalAppraisal<=0 && remP <= progGain(A.rapidSynth) && st.cp>=1)
+      return r("finalAppraisal","次の突貫が当たると完成してしまう。最終確認(1CP)で完成防止してから押す");
+    if(st.durability<=12 && !(st.buffs.manipulation>0 && st.durability>5)){
+      if(cond==="pliant" && st.buffs.manipulation<=0 && st.cp>=48) return r("manipulation","高能率マニピュ48。突貫の耐久燃料を確保");
+      if(st.buffs.manipulation<=0 && st.cp>=96+goalCp) return r("manipulation","耐久が突貫の燃料切れ。マニピュで立て直す");
+      if(st.cp>=88+goalCp) return r("mastersMend","メンドで突貫の燃料補給");
+    }
+    if(cond==="pliant" && st.buffs.manipulation<=0 && st.cp>=48) return r("manipulation","高能率マニピュ48はいつでもお得。突貫の燃料に");
+    if(cond==="good" && st.iq<2 && st.cp>=cpCost(A.preciseTouch) && st.durability>durCost(A.preciseTouch))
+      return r("preciseTouch","序盤の高品質だけは集中加工(150%×1.75・IQ+2)が美味い");
+    if(cond==="good") return r("tricks","高品質は秘訣でCP+20を後半へ貯金（v5はCP温存が命。IQ10後の高品質は集中加工に切替）");
+    if(st.buffs.veneration<=0 && st.cp>=18) return r("veneration","ヴェネレーションを張って突貫(0CP)を強化");
+    if(st.durability>durCost(A.rapidSynth))
+      return r("rapidSynth","突貫作業(0CP・成功50%"+(cond==="centered"?"→安定で75%":"")+")で工数を押す。失敗は気にしたら負け"+(cond==="malleable"?"（高進捗1.5倍！）":""));
+    if(st.cp>=cpCost(A.carefulSynth) && st.durability>durCost(A.carefulSynth)) return r("carefulSynth","耐久が半端。模範作業で刻む");
+    if(st.cp>=cpCost(A.prudentSynth) && st.durability>5) return r("prudentSynth","倹約作業(耐久5)で刻む");
+    if(st.durability>durCost(A.hastyTouch)) return r("hastyTouch","耐久もCPも細い。0CPで粘ってIQだけでも積む");
+    return r("basicSynth","作業(0CP)で刻む");
+  }
+  // === 旧・工数フェーズ（v4。v5では工数リーチ後のリカバリー用フォールバック） ===
   if(!progDone){
     const gwCost = durCost(A.groundwork);
     // 耐久維持を最優先（残り耐久が下地1回分を切ったら手当て）
@@ -871,7 +917,7 @@ function recommendCore(){
       return r("daringTouch","ヘイスティ成功の勢い！デアリングタッチ(CP0・150%)はタダで振れる大サイコロ");
     // コンボ・ドクトリン(2026-08-17): CPが潤沢なら加工→中級→上級コンボ(各18CP)が品質単価最強(約72品質/CP)。
     // ヘイスティはCPが細った時の代替。フル手打ちでは制約資源はCPでなく耐久＝マニピュ/メンド投資を惜しまない
-    if(st.iq>=10 && st.buffs.innovation>0 && st.cp>=140 && st.durability>durCost(A.basicTouch)){
+    if(st.iq>=10 && st.buffs.innovation>0 && st.cp>=COMBO_FLOOR && st.durability>durCost(A.basicTouch)){
       if(st.lastAction==="basicTouch") return r("standardTouch","コンボで中級加工18CP(125%)。三段コンボが品質単価最強");
       if(st.lastAction==="standardTouch") return r("advancedTouch","コンボ〆の上級加工18CP(150%)");
       return r("basicTouch","コンボ始動の加工18CP。中級→上級と繋いで約72品質/CPを回す");
@@ -909,6 +955,7 @@ function recommendCore(){
       return r("byregot","高品質×ビエルゴ！1.75倍が乗る最大の一撃で仕上げる");
     // v4: 秘訣(+20)は集中加工(約2,700品質)より弱いトレード。本当にCPが底の時だけ
     if(st.cp < 60 && remQ > by*1.75) return r("tricks","高品質だがCPが底。秘訣で+20回収してビエルゴ資金に");
+    // 高品質は集中加工が正解（コスモツールの1.75倍込みで2,740。秘訣+20貯金はMCで明確に劣後）
     if(st.cp>=cpCost(A.preciseTouch) && st.durability>durCost(A.preciseTouch))
       return r("preciseTouch","高品質は集中加工（150%×1.75、IQ+2）。品質/CP効率が全技で最強");
     return r("tricks","集中加工がCPか耐久で撃てない。秘訣+20で回収し、マニピュ/メンドは次の通常ターンで");
@@ -920,15 +967,16 @@ function recommendCore(){
   // === フィニッシュCP予約（v4.2）: 品質未達でも〆コンボ代（ヴェネ18+下地18×2=54・絶技前提）は死守 ===
   // seed597事件: 品質31,520(キャップ)に到達したのにCP3で〆が打てず工数853残しで耐久死。予約ライン以下では
   // 「出し切りビエルゴ→0CP技で品質ガチャ→届いたら温存した54CPで〆」に切り替える
-  const finReserve = st.tpUsed ? 90 : 54;
+  // v5: 工数リーチ済みなら〆は作業0CPなので、予約対象は勝ち確パック代(goalCp)になる
+  const finReserve = progReady ? goalCp : (st.tpUsed ? 90 : 54);
   // 射程ゲート: 高品質ビエルゴ＋ヘイスティ数発で31,500に届く圏内のときだけ〆予約を発動。
   // 射程外で予約しても勝ち筋がない（完走・品質未達＝同じ負け）ので、品質の尻尾を伸ばす方に賭ける
   const strikeQ = Math.floor(byregotEstimate()*1.75) + 1500;
   if(st.cp <= finReserve + 30 && remQ <= strikeQ){
     if(st.iq>=6 && st.buffs.innovation<=0 && !st.qiUsed)
       return r("quickInnovation","出し切り前に0CPのクイックイノベを乗せる（ビエルゴ1.5倍）");
-    if(st.iq>=6 && st.durability>10 && st.cp>=cpCost(A.byregot)+finReserve)
-      return r("byregot","CPが〆予約ライン("+finReserve+")接近。ここでビエルゴを出し切る（以降は0CP技と〆のみ）");
+    if(st.iq>=6 && st.durability<=12 && st.cp>=cpCost(A.byregot)+ (progReady?0:finReserve))
+      return r("byregot","耐久が尽きる前にビエルゴを出し切る");
     if(st.buffs.expedience>0 && st.durability>durCost(A.daringTouch)) return r("daringTouch","予約ライン下は0CP技のみ。デアリング(150%)");
     if(st.durability>durCost(A.hastyTouch)+22)
       return r("hastyTouch","〆代"+finReserve+"CPを温存して0CPヘイスティで品質ガチャ（ラインに届いた瞬間〆コンボへ）");
@@ -981,7 +1029,14 @@ function recommendCore(){
   if(st.iq<10){
     if(st.buffs.wasteNot>0) return r(st.lastAction==="basicTouch"?"refinedTouch":"basicTouch","倹約中は倹約加工が使えない。加工→洗練加工コンボでIQを積む(洗練はIQ+2)");
     if(st.buffs.innovation<=0 && st.iq>=2 && st.cp>=18+50) return r("innovation","イノベーションを維持して加工1回あたりの品質を1.5倍に");
-    if(st.cp>=cpCost(A.prudentTouch) && st.durability>5) return r("prudentTouch","倹約加工で耐久5のままIQを積む（基本形）");
+    // v5.1: IQ積みは加工→洗練コンボ(42CPで3IQ)。CP温存経済では14CP/IQが倹約25CP/IQに勝る（Chachapa式）
+    if(cond==="centered" && st.durability>durCost(A.hastyTouch))
+      return r("hastyTouch","安定はヘイスティ85%。0CPでIQを積むチャンス");
+    if(st.lastAction==="basicTouch" && st.cp>=cpCost(A.refinedTouch) && st.durability>durCost(A.refinedTouch))
+      return r("refinedTouch","洗練加工コンボ(IQ+2)。加工→洗練が最安のIQ積み");
+    if(st.cp>=cpCost(A.basicTouch)+30 && (st.buffs.manipulation>0 ? st.durability>12 : st.durability>22))
+      return r("basicTouch","加工→洗練コンボ始動。IQ単価14CP/IQ");
+    if(st.cp>=cpCost(A.prudentTouch) && st.durability>5) return r("prudentTouch","耐久が細い。倹約加工(耐久5)でIQを積む");
     if(st.hsActive) return r("tricks","一心不乱が有効。秘訣でCP+20");
     if(st.durability>durCost(A.hastyTouch)) return r("hastyTouch","CPが尽きた。ヘイスティタッチ(CP0・成功率60%)でIQガチャ。成功すればデアリングも");
   } else {
@@ -999,7 +1054,7 @@ function recommendCore(){
       return r("greatStrides","素のビエルゴでは届かない。グレストを張って高品質(1.75倍)ビエルゴを祈る");
     // 設計変更と一心不乱は終盤のGS祈り用に温存する（中盤で薦めない）— 2026-08-16の実戦ログ反省より
     if(st.hsActive && st.cp>=cpCost(A.preciseTouch)) return r("preciseTouch","一心不乱が有効。集中加工で大きく品質を積む");
-    if(st.buffs.innovation>0 && st.cp>=140 && st.durability>durCost(A.basicTouch)){
+    if(st.buffs.innovation>0 && st.cp>=COMBO_FLOOR && st.durability>durCost(A.basicTouch)){
       if(st.lastAction==="basicTouch") return r("standardTouch","コンボで中級加工18CP(125%)");
       if(st.lastAction==="standardTouch") return r("advancedTouch","コンボ〆の上級加工18CP(150%)");
       return r("basicTouch","コンボ始動の加工18CP。中級→上級と繋いで品質単価最強を回す");

@@ -50,16 +50,18 @@ function extractEngineSource(html) {
 }
 
 function transformSource(src) {
-  const NEEDLE = "st.cp>=140";
+  // v5.1以降: エンジン側が COMBO_FLOOR 定数（既定9999=コンボ封印）を持つ。
+  // --thresholds はこの定数の上書きとしてスイープに使う
+  const NEEDLE = "let COMBO_FLOOR = 9999;";
   const parts = src.split(NEEDLE);
   const count = parts.length - 1;
-  if (count !== 2) {
+  if (count !== 1) {
     throw new Error(
-      `expected exactly 2 occurrences of "${NEEDLE}" in engine source, found ${count}. ` +
+      `expected exactly 1 occurrence of "${NEEDLE}" in engine source, found ${count}. ` +
       "index.html のコードが変わった可能性。mc.mjs の置換ロジックを見直すこと。"
     );
   }
-  return parts.join("st.cp>=HASTY_CP_THRESHOLD");
+  return parts.join("let COMBO_FLOOR = HASTY_CP_THRESHOLD;");
 }
 
 // DOMスタブ: エンジンのロード時実行コード (readSettings / newState / localStorage復元 / render)
@@ -101,8 +103,8 @@ render = function () {};     // 以後の描画は完全に無効化 (ロード�
 return {
   get st() { return st; },
   set st(v) { st = v; },
-  get threshold() { return HASTY_CP_THRESHOLD; },
-  set threshold(v) { HASTY_CP_THRESHOLD = v; },
+  get threshold() { return COMBO_FLOOR; },
+  set threshold(v) { HASTY_CP_THRESHOLD = v; COMBO_FLOOR = v; },
   set follow(v) { followMode = v; },
   resetAux: function () { undoStack = []; pendingRapid = null; forcedRoll = null; },
   newState: newState, rollCondition: rollCondition, canUse: canUse,
