@@ -115,7 +115,7 @@
 </head>
 <body>
 <header>
-  <h1>ルインド・アクアダクト中間素材 製作支援・進化版 <span id="app-ver" style="font-size:0.78em; font-weight:700; color:var(--accent); border:1px solid var(--accent); border-radius:8px; padding:1px 9px; vertical-align:middle; white-space:nowrap;">v5.2</span></h1>
+  <h1>ルインド・アクアダクト中間素材 製作支援・進化版 <span id="app-ver" style="font-size:0.78em; font-weight:700; color:var(--accent); border:1px solid var(--accent); border-radius:8px; padding:1px 9px; vertical-align:middle; white-space:nowrap;">v5.3</span></h1>
   <!-- ※ app-ver はパッチのたびに手で上げる（コミットとセットで）。リロードでこの数字が変われば更新が来た合図 -->
   <div class="sub">部材/金属材/錬金樹脂 共通レシピ(rlvl776) 工数11250 / 品質31520 / 耐久60 ｜ 完成ライン品質31500 ｜ 前半マクロ＋後半手打ちのハイブリッド運用対応</div>
   <div class="tabs">
@@ -1008,7 +1008,16 @@ function recommendCore(){
     if(st.iq<10 && st.durability>5 && st.cp>=13) return r("prudentTouch","高能率で倹約加工が13CP。お得にIQを積む");
   }
   // 耐久ガード: 次の一手で耐久0にならないように
-  if(st.durability<=10 && st.iq>=10 && st.cp>=cpCost(A.trainedFinesse)) return r("trainedFinesse","耐久を使わず匠の神業で品質を伸ばす");
+  // v5.3: 神業スパムロック修正（実戦6本目）。旧実装はイノベ切れでも神業を勧め続け、素撃ち696連発＋
+  // マニピュ再張り不能に陥っていた。イノベ(耐久0)→マニピュ復旧→神業の順で判断する
+  if(st.durability<=10 && st.iq>=10){
+    if(st.buffs.innovation<=0 && st.cp>=18+cpCost(A.trainedFinesse))
+      return r("innovation","耐久ピンチでもイノベは耐久消費0。先に張って品質技を1.5倍に");
+    if(st.buffs.manipulation<=0 && st.cp>=96+90)
+      return r("manipulation","マニピュで耐久エンジンを復旧（0CPのヘイスティが復活する）");
+    if(st.cp>=cpCost(A.trainedFinesse))
+      return r("trainedFinesse","耐久を使わず匠の神業で品質を伸ばす"+(st.buffs.innovation>0?"（イノベ1.5倍込み）":""));
+  }
   if(st.durability<=5 || (st.durability<=10 && st.buffs.manipulation<=0)){
     if(cond==="pliant" && st.cp>=48) return r("manipulation","高能率でマニピュレーション48CP");
     if(st.buffs.manipulation<=0 && st.cp>=96+50) return r("manipulation","耐久が危険水域。マニピュレーションで立て直す");
