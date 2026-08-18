@@ -19,7 +19,8 @@ const HTML_PATH = join(__dir, "..", "index.html");
 
 /* ================= CLI ================= */
 function parseArgs(argv) {
-  const o = { runs: 1000, thresholds: [140], seed: 42, out: "results", parity: false, brain: "core" };
+  const o = { runs: 1000, thresholds: [140], seed: 42, out: "results", parity: false, brain: "core",
+              depth: null, w: null, beam: null, simparity: 0 };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--parity") o.parity = true;
@@ -27,10 +28,14 @@ function parseArgs(argv) {
     else if (a === "--thresholds") o.thresholds = argv[++i].split(",").map((s) => parseInt(s, 10));
     else if (a === "--seed") o.seed = parseInt(argv[++i], 10);
     else if (a === "--out") o.out = argv[++i];
-    else if (a === "--brain") o.brain = argv[++i]; // core=recommendCore(生ドクトリン) / safe=recommend(UIと同じwouldDie安全網つき)
+    else if (a === "--brain") o.brain = argv[++i]; // core=recommendCore(生ドクトリン) / safe=recommend(UIと同じwouldDie安全網つき) / search=v6先読み
+    else if (a === "--depth") o.depth = parseInt(argv[++i], 10); // v6探索の深さ上書き
+    else if (a === "--beam") { const [r, inn] = argv[++i].split(",").map(Number); o.beam = { root: r, inner: inn }; }
+    else if (a === "--w") { const [k, v] = argv[++i].split("="); (o.w ??= {})[k] = parseFloat(v); } // 評価関数の重み上書き（繰り返し可）
+    else if (a === "--simparity") o.simparity = parseInt(argv[++i], 10); // simApply vs doAction 差分テスト（Nプレイアウト）
     else throw new Error("unknown arg: " + a);
   }
-  if (o.brain !== "core" && o.brain !== "safe") throw new Error("--brain must be core|safe");
+  if (!["core", "safe", "search"].includes(o.brain)) throw new Error("--brain must be core|safe|search");
   if (!Number.isInteger(o.runs) || o.runs <= 0) throw new Error("--runs invalid");
   if (o.thresholds.some((t) => !Number.isInteger(t))) throw new Error("--thresholds invalid");
   return o;
@@ -107,6 +112,11 @@ return {
   set threshold(v) { HASTY_CP_THRESHOLD = v; COMBO_FLOOR = v; },
   set follow(v) { followMode = v; },
   resetAux: function () { undoStack = []; pendingRapid = null; forcedRoll = null; },
+  set forced(v) { forcedRoll = v; },
+  get searchDepth() { return SEARCH_DEPTH; }, set searchDepth(v) { SEARCH_DEPTH = v; },
+  get searchW() { return SEARCH_W; }, set searchW(v) { Object.assign(SEARCH_W, v); },
+  get searchBeam() { return SEARCH_BEAM; }, set searchBeam(v) { Object.assign(SEARCH_BEAM, v); },
+  recommendSearch: recommendSearch, simClone: simClone, simApply: simApply, evalSearch: evalSearch,
   newState: newState, rollCondition: rollCondition, canUse: canUse,
   cpCost: cpCost, durCost: durCost, progGain: progGain, qualGain: qualGain,
   doAction: doAction, recommendCore: recommendCore, recommend: recommend,
@@ -163,7 +173,7 @@ function playOne(eng, threshold, seed, brain = "core") {
     // 安全弁: followMode=false なら本来到達しないが、awaitCond が立っていたら自前で抽選
     if (st.awaitCond) { st.awaitCond = false; st.condition = eng.rollCondition(); }
 
-    const rec = brain === "safe" ? eng.recommend() : eng.recommendCore();
+    const rec = brain === "safe" ? eng.recommend() : brain === "search" ? eng.recommendSearch() : eng.recommendCore();
     if (!rec || !eng.A[rec.id]) { outcome = "harness_artifact"; detail = "no recommendation"; break; }
     if (!eng.canUse(eng.A[rec.id])) { outcome = "harness_artifact"; detail = "canUse=false: " + rec.id; break; }
 
@@ -284,6 +294,46 @@ function runCondCheck(eng) {
     if (diff > TOL) errs.push(line);
     else console.log("  OK  " + line);
   }
+  return errs;
+}
+
+/* ================= simApply差分テスト (v6探索の正しさの土台) ================= */
+// ランダム合法手プレイアウトで、探索用の副作用なしステップ関数 simApply の予測と
+// 実エンジン doAction の実状態を全フィールド突合する。条件(condition)は実側が乱数抽選のため比較しない。
+function runSimParity(eng, n, seed) {
+  const FIELDS = ["step", "progress", "quality", "durability", "cp", "iq",
+    "tpReady", "tpUsed", "hsActive", "hsUsed", "qiUsed", "coLeft", "lastAction", "finished", "failed"];
+  const rng = mulberry32(seed ^ 0x5eed);
+  let checked = 0, errs = 0;
+  for (let p = 0; p < n; p++) {
+    Math.random = mulberry32(seed + 1000 + p);
+    eng.resetAux();
+    eng.st = eng.newState();
+    for (let it = 0; it < 90; it++) {
+      const st = eng.st;
+      if (st.finished || st.failed) break;
+      if (st.awaitCond) { st.awaitCond = false; st.condition = eng.rollCondition(); }
+      const legal = eng.ACTIONS.filter((a) => !a.neverUsable && eng.canUse(a)).map((a) => a.id);
+      if (!legal.length) break;
+      const id = legal[Math.floor(rng() * legal.length)];
+      let ok = true;
+      if (eng.A[id].successRate !== undefined) { ok = rng() < 0.5; eng.forced = ok ? 0 : 1; }
+      const pred = eng.simApply(eng.simClone(st), id, ok);
+      eng.doAction(id);
+      eng.forced = null;
+      const real = eng.st;
+      checked++;
+      for (const f of FIELDS) {
+        if (pred[f] !== real[f]) { errs++; console.error(`  FAIL p${p} it${it} act=${id} ok=${ok} ${f}: sim=${pred[f]} real=${real[f]}`); }
+      }
+      for (const k of Object.keys(real.buffs)) {
+        if (pred.buffs[k] !== real.buffs[k]) { errs++; console.error(`  FAIL p${p} it${it} act=${id} ok=${ok} buffs.${k}: sim=${pred.buffs[k]} real=${real.buffs[k]}`); }
+      }
+      if (errs > 30) { console.error("  too many mismatches, abort"); Math.random = ORIG_RANDOM; return errs; }
+    }
+  }
+  Math.random = ORIG_RANDOM;
+  console.log(`simparity: ${n} playouts / ${checked} steps checked, ${errs} mismatches`);
   return errs;
 }
 
@@ -411,6 +461,17 @@ function main() {
   }
   console.log("parity: ALL PASSED");
   if (opt.parity) return;
+
+  if (opt.depth !== null) eng.searchDepth = opt.depth;
+  if (opt.w) eng.searchW = opt.w;
+  if (opt.beam) eng.searchBeam = opt.beam;
+
+  if (opt.simparity > 0) {
+    console.log(`=== simparity (simApply vs doAction, ${opt.simparity} random playouts) ===`);
+    const serrs = runSimParity(eng, opt.simparity, opt.seed);
+    if (serrs > 0) { console.error("simparity FAILED — v6探索は数値的に信用できない状態。abort"); process.exitCode = 1; }
+    return;
+  }
 
   const outDir = join(__dir, opt.out);
   mkdirSync(outDir, { recursive: true });

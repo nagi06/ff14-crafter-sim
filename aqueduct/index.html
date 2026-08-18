@@ -115,7 +115,7 @@
 </head>
 <body>
 <header>
-  <h1>ルインド・アクアダクト中間素材 製作支援・進化版 <span id="app-ver" style="font-size:0.78em; font-weight:700; color:var(--accent); border:1px solid var(--accent); border-radius:8px; padding:1px 9px; vertical-align:middle; white-space:nowrap;">v5.6</span></h1>
+  <h1>ルインド・アクアダクト中間素材 製作支援・進化版 <span id="app-ver" style="font-size:0.78em; font-weight:700; color:var(--accent); border:1px solid var(--accent); border-radius:8px; padding:1px 9px; vertical-align:middle; white-space:nowrap;">v6.0</span></h1>
   <!-- ※ app-ver はパッチのたびに手で上げる（コミットとセットで）。リロードでこの数字が変われば更新が来た合図 -->
   <div class="sub">部材/金属材/錬金樹脂 共通レシピ(rlvl776) 工数11250 / 品質31520 / 耐久60 ｜ 完成ライン品質31500 ｜ 前半マクロ＋後半手打ちのハイブリッド運用対応</div>
   <div class="tabs">
@@ -314,7 +314,7 @@
     <li>コスモツールの特殊効果<b>「高品質」時の品質上昇量1.75倍</b>（通常道具は1.5倍）を品質計算・おすすめ・勝算判定に反映済み。新式装備で挑む場合は<a href="../shinshiki/">新式版</a>を使うこと</li>
     <li>出る状態は【通常・高品質・高進捗・高能率・頑丈・頑強・安定・長持続】の8種のみ。<b>最高品質・不調・良兆候は高難度レシピでは出ない</b>（検証者のリストと仕様解説で確認済み）。頑強（耐久半減＋次ターン必ず頑丈）は実プレイで確認済み</li>
     <li>状態変化の出現率は<b>実機ミラー実測ベース</b>（2026-08-18・部材48T/44サンプル: 頑丈17% / 頑強10% / 高品質10% / 高進捗9% / 高能率14% / 安定10% / 長持続9% / 通常21%、頑強の翌ターンは必ず頑丈）。<b>頑丈系がターンの4割前後</b>、高品質は旧推定の半分。サンプルが増えたら CONDITIONS の数値を更新して精度を上げる</li>
-    <li>「おすすめ」はあくまで<b>判断の目安</b>。機械的におすすめだけを追った自動テストでは完走成功率は数%だった（惜敗2.9万台が多数）。状態の引きに合わせた人間の判断——特にビエルゴを撃つ/待つの見極め——で上積みするのが本番</li>
+    <li>「おすすめ」はv6で<b>先読み期待値探索</b>になった（設定タブ「おすすめの思考」で深さ変更可）。数手先を成功確率と次ターンの状態出現率で期待値展開し、ゴール逆算の評価で最大値の手を出す。機械自動プレイの勝率はv5系ヒューリスティック6.2%→v6探索で深さ3手9.5%・4手23.5%・5手30%（既定）・6手37%（MC測定2026-08-18）。それでも<b>判断の目安</b>であることは変わらない——状態の引きに合わせた人間の判断で上積みするのが本番</li>
   </ul>
 </div>
 
@@ -323,6 +323,14 @@
   <div class="set-row"><label>作業精度（実効値）<span class="hint">飯・薬・マイスター全部込みの実数値をそのまま。必要値5620。既定はスターズ実測（証込み 2026-08-15）</span></label><input type="number" id="in-craft" value="5799" oninput="updateBaseline()"></div>
   <div class="set-row"><label>加工精度（実効値）<span class="hint">全部込みの実数値をそのまま（スターズ＋アリペブレHQ実測5637。素は5522）</span></label><input type="number" id="in-control" value="5637" oninput="updateBaseline()"></div>
   <div class="set-row"><label>開始CP（実効値）<span class="hint">製作画面のCP最大値をそのまま（スターズ実測: 装備664＋飯106＋薬21＝791）</span></label><input type="number" id="in-cp" value="791" oninput="updateBaseline()"></div>
+  <div class="set-row"><label>おすすめの思考<span class="hint">先読み＝数手先の期待値探索（v6）。深いほど強いが1手の思考が遅くなる（機械勝率実測: 3手9.5%・4手23.5%・5手30%・6手37%、v5=6.2%）。変更は即時反映</span></label>
+    <select id="in-depth" onchange="applyDepth()" style="font-size:1rem; padding:4px 8px;">
+      <option value="0">v5 ヒューリスティック</option>
+      <option value="3">先読み・軽量（3手・一瞬）</option>
+      <option value="4">先読み・標準（4手・約0.1秒）</option>
+      <option value="5" selected>先読み・深い（5手・約0.5秒・推奨）</option>
+      <option value="6">先読み・最深（6手・数秒・実験的）</option>
+    </select></div>
   <div class="set-row"><label>スタートライン<span class="hint">上3つから自動計算。製作画面の表示と一致していれば入力OK</span></label><div id="set-baseline" style="font-size:0.9rem; font-weight:700;"></div></div>
   <p class="apply-note">※ 3欄とも飯・薬・マイスター込みで「ゲーム画面に出ている実数値」を入れる（作業/加工＝キャラ画面、CP＝製作画面の最大値）。個別ボーナス欄は廃止。変更は「最初から」を押した次の製作から反映されます。</p>
 </div>
@@ -1137,13 +1145,251 @@ function assess(){
   q += Math.floor(Math.floor(bq*2+EPS)*3*2.5+EPS); // GS+イノベのビエルゴ
   // 上振れ期待: 高品質(集中加工/1.5倍ビエルゴ)
   const turns = nProg + need + finesseN + 3;
-  const upside = q + Math.round(turns*0.14*1950); // 高品質(約14%)による集中加工/1.75倍ビエルゴの上積み期待（コスモツール効果で1.5倍時の約1.5倍）
+  const upside = q + Math.round(turns*0.08*1950); // 高品質(v5.5再校正で自然出現8%)による集中加工/1.75倍ビエルゴの上積み期待
 
   const nums = `無風見込み${q.toLocaleString()} / 上振れ込み${upside.toLocaleString()} / 残り品質${remQ.toLocaleString()}`;
   if(durShort && cp<=96) return {lv:"bad", head:"見切り推奨", text:`耐久もCPも足りない（${nums}）。工数だけ完成させて終了を（完走なら低確率で素材が返る）`};
   if(q >= remQ)     return {lv:"ok",   head:"続行推奨", text:`高品質を引けなくても届く計算（${nums}）`};
   if(upside >= remQ) return {lv:"pray", head:"続行（お祈り圏）", text:`高品質を引ければ届く（${nums}）。グレスト＋イノベを維持して祈る`};
   return {lv:"bad", head:"見切り推奨", text:`上振れ込みでも届かない公算大（${nums}）。工数だけ完成させて終了を（完走なら低確率で素材が返る）`};
+}
+
+/* ========= v6 先読みエンジン（expectimax探索・2026-08-18） =========
+   ヒューリスティック(v5)の代替。数手先を「成功判定＝チャンスノード」で期待値展開し、
+   ゴール逆算の評価関数で葉を採点して期待値最大の手を返す。
+   将来ターンの状態変化は「通常」とみなす（8状態で分岐すると爆発するため。
+   状態の持ち値は評価関数の資源項が代弁する）。ライバルツール crafter-navi と同じ土俵。 */
+let SEARCH_DEPTH = 5; // 0=v5ヒューリスティック / 3=軽量 / 4=標準 / 5=深い(既定) / 6=最深
+let SEARCH_BEAM = { root: 10, inner: 5 }; // ビーム幅（各ノードで即時評価上位のみ深掘り）
+let SEARCH_W = {
+  // 品質はそのまま1点=1。ゴール逆算: 葉の価値＝「この盤面から最終的に取れる品質見込み」
+  cpRate: 35,       // CP1→品質の変換レート。MCスイープ実測(2026-08-18): 25→3.0% 30→7.2% 35→10.0% 37→8.8% 38→8.2%(膠着増)。35が山頂
+  durDebt: 60,      // 完走負債: 残工数を0CP作業で払い切るのに足りない耐久1あたり
+  winReach: 3000,   // 品質見込みが31500到達＋完走可能のボーナス（勝ち筋圏）
+  iq: 150,          // IQ残余価値（cpRate/パック側で主に評価するため小さめ）
+  dur: 30,          // 完走勘定後の余剰耐久1あたり
+  step: 25,         // 1ターンあたりの経過ペナルティ（noStep技との比較・完走タイミングにのみ効く）
+  stepLate: 25,     // ターン40以降の追加ペナルティ/手（終盤の貯め込み膠着つぶし）
+  finishShort: 1.0, // 品質未達完走の品質1あたり
+  bInnov: 120, bGS: 250, bVene: 60, bManip: 30, bMM: 300, bExp: 80, // 残存バフの持ち値
+  rTP: 200, rHS: 150, rQI: 100, rCO: 80, // 温存資源（絶技・一心・QI・設計変更）の持ち値
+};
+
+// 探索用の軽量クローン（history/undo/描画なし。doActionは重いので探索の内側では使わない）
+function simClone(s){
+  return {
+    step:s.step, progress:s.progress, quality:s.quality, durability:s.durability, cp:s.cp,
+    iq:s.iq, condition:s.condition,
+    buffs:{ veneration:s.buffs.veneration, innovation:s.buffs.innovation, greatStrides:s.buffs.greatStrides,
+            wasteNot:s.buffs.wasteNot, manipulation:s.buffs.manipulation, muscleMemory:s.buffs.muscleMemory,
+            finalAppraisal:s.buffs.finalAppraisal, expedience:s.buffs.expedience },
+    tpReady:s.tpReady, tpUsed:s.tpUsed, hsActive:s.hsActive, hsUsed:s.hsUsed, qiUsed:s.qiUsed, coLeft:s.coLeft,
+    lastAction:s.lastAction, finished:s.finished, failed:s.failed, awaitCond:false,
+    history:[],
+  };
+}
+
+// 副作用なしステップ関数: doAction＋endStepの数値ロジックを、グローバルstを一時スワップして
+// 既存の cpCost/durCost/progGain/qualGain で再現する（数値パリティを構造的に保証）。
+// success: 成功判定つき技(突貫・ヘイスティ・デアリング)の結果をチャンスノード側から指定
+function simApply(s, id, success){
+  const sv = st; st = s;
+  try{
+    const a = A[id];
+    const condKey = st.condition;
+    st.cp -= cpCost(a);
+    if(a.id==="carefulObservation"){ st.coLeft--; st.condition="normal"; return s; } // 先読み中の引き直し先は通常扱い
+    if(a.id==="heartAndSoul"){ st.hsUsed=true; st.hsActive=true; return s; }
+    if(a.id==="quickInnovation"){ st.qiUsed=true; if(st.buffs.innovation<=0) st.buffs.innovation=1; return s; }
+    if(a.id==="finalAppraisal"){ st.buffs.finalAppraisal=5; return s; }
+    if(a.id==="trainedPerfection"){ st.tpUsed=true; st.tpReady=true; }
+
+    const dcost = durCost(a);
+    if(a.dur>0 && st.tpReady){ st.tpReady=false; }
+
+    let ok = true;
+    if(a.successRate!==undefined) ok = success!==false;
+
+    if(a.type==="synth" || a.qualEff!==undefined){
+      if(ok){
+        const gainedP = progGain(a, a.id==="groundwork" && st.durability < dcost ? a.eff/2 : a.eff);
+        if(a.goodOnly && !isGoodish(condKey) && st.hsActive){ st.hsActive=false; }
+        st.progress = Math.min(RECIPE.difficulty, st.progress + gainedP);
+        if(st.buffs.muscleMemory>0) st.buffs.muscleMemory = 0;
+        if(a.qualEff!==undefined){
+          st.quality = Math.min(RECIPE.maxQuality, st.quality + qualGain(a, a.qualEff));
+          st.iq = Math.min(10, st.iq+1);
+          if(st.buffs.greatStrides>0) st.buffs.greatStrides=0;
+        }
+      }
+    } else if(a.type==="touch"){
+      if(a.goodOnly && !isGoodish(condKey) && st.hsActive){ st.hsActive=false; }
+      if(ok){
+        st.quality = Math.min(RECIPE.maxQuality, st.quality + qualGain(a));
+        if(a.byregot){ st.iq = 0; }
+        else {
+          let g = a.iqGain||1;
+          if(a.id==="refinedTouch" && st.lastAction==="basicTouch") g = 2;
+          st.iq = Math.min(10, st.iq + g);
+        }
+        if(st.buffs.greatStrides>0) st.buffs.greatStrides=0;
+        if(a.id==="hastyTouch") st.buffs.expedience = 1;
+      }
+    } else if(a.type==="buff"){
+      if(a.buff){ st.buffs[a.buff] = a.steps + (condKey==="primed"?2:0); }
+    } else if(a.id==="tricks"){
+      st.cp = Math.min(maxCP(), st.cp+20);
+      if(!isGoodish(condKey) && st.hsActive){ st.hsActive=false; }
+    } else if(a.id==="mastersMend"){
+      st.durability = Math.min(RECIPE.durability, st.durability+30);
+    } else if(a.id==="immaculateMend"){
+      st.durability = RECIPE.durability;
+    }
+    if(a.id==="muscleMemory"){ st.buffs.muscleMemory = 5 + (condKey==="primed"?2:0); }
+    if(a.id==="reflect"){ st.iq = 2; }
+
+    st.durability -= dcost;
+
+    if(st.progress >= RECIPE.difficulty){
+      if(st.buffs.finalAppraisal>0){
+        st.progress = RECIPE.difficulty-1;
+        st.buffs.finalAppraisal = 0;
+      } else {
+        st.finished = true;
+        if(st.quality < RECIPE.requiredQuality) st.failed = true;
+        return s;
+      }
+    }
+    if(st.durability <= 0){ st.failed = true; return s; }
+
+    // endStep相当
+    if(st.buffs.manipulation>0 && a.buff!=="manipulation" && st.durability>0){
+      st.durability = Math.min(RECIPE.durability, st.durability+5);
+    }
+    for(const k of Object.keys(st.buffs)){
+      if(a.buff===k) continue;
+      if(a.id==="muscleMemory" && k==="muscleMemory") continue;
+      if(a.id==="hastyTouch" && k==="expedience") continue;
+      if(st.buffs[k]>0) st.buffs[k]--;
+    }
+    st.lastAction = a.id;
+    st.step++;
+    st.condition = st.condition==="robust" ? "sturdy" : "normal"; // 頑強→頑丈は確定。他の未来は通常扱い
+    return s;
+  } finally { st = sv; }
+}
+
+function simCandidates(s){
+  const sv = st; st = s;
+  try{
+    const out = [];
+    for(const a of ACTIONS){ if(!a.neverUsable && canUse(a)) out.push(a.id); }
+    return out;
+  } finally { st = sv; }
+}
+
+// 葉の評価: ゴール逆算距離（品質→goalQ・パック準備・工数リーチ・資源の持ち値）
+function evalSearch(s){
+  if(s.finished && !s.failed) return 1e9 + s.quality + s.cp*2 - s.step*50; // 勝利。速く・高く・余して
+  if(s.finished) return s.quality*SEARCH_W.finishShort - 2000;             // 品質未達完走≒潜在なしの生存。死ぬくらいなら完走する
+  if(s.failed) return -1e6 + s.quality*0.1;                                // 耐久死
+  const bq = baseQual();
+  const packQ = Math.floor(Math.floor(bq*2+EPS)*3*2.5+EPS); // IQ10・GS+イノベのビエルゴ（v5勝ち確パック）
+  const goalCp = 32 + 24 + (s.qiUsed ? 18 : 0);
+  const remP = RECIPE.difficulty - s.progress;
+  const progReach = Math.floor(baseProg()*1.2);
+  // 完走勘定: 残工数を0CP作業(120%)換算で払うのに要る耐久 vs 手持ち＋マニピュ見込み＋絶技
+  const finActs = remP>0 ? Math.ceil(remP/progReach) : 0;
+  const durAvail = s.durability + Math.min(s.buffs.manipulation,8)*5 + (s.tpUsed?0:10);
+  const durAfterFin = durAvail - finActs*10;
+  // 品質見込み（ゴール逆算）: 実品質 + 残CPの品質変換 + ビエルゴパック（IQ未満なら減額）
+  const cpFree = Math.max(0, s.cp - goalCp);
+  // 変換レートは実現手段に連動: 耐久経済が死んでいる盤面は神業(32.6/CP)しか出口がないため、
+  // レートを31にクランプして「使うと損」の永久保留（膠着）を防ぐ
+  const cpRate = (s.durability + Math.min(s.buffs.manipulation,8)*5 <= 15) ? Math.min(SEARCH_W.cpRate, 31) : SEARCH_W.cpRate;
+  const qFromCp = cpFree * cpRate * (0.5 + 0.05*s.iq);
+  const packMult = s.iq>=10 ? 1 : 0.3 + 0.07*s.iq;
+  // パックはCPで払える分しか計上しない（ビエルゴ代を食い潰すとゴールごと消える構造を葉に見せる）
+  const packAfford = s.cp>=goalCp ? 1 : s.cp>=56 ? 0.8 : s.cp>=24 ? (s.qiUsed?0.6:0.7) : 0;
+  const qFin = s.quality + qFromCp + packQ*packMult*packAfford;
+  let v = Math.min(qFin, RECIPE.requiredQuality);
+  if(qFin >= RECIPE.requiredQuality && durAfterFin >= 0) v += SEARCH_W.winReach; // 勝ち筋圏
+  if(durAfterFin < 0) v -= (-durAfterFin)*SEARCH_W.durDebt; // 地平線の先の耐久死を葉に見せる
+  else v += Math.min(durAfterFin, 30)*SEARCH_W.dur;
+  v += s.iq*SEARCH_W.iq;
+  v -= s.step*SEARCH_W.step + Math.max(0, s.step-40)*SEARCH_W.stepLate;
+  // 残存バフと温存資源の持ち値（地平線でバフを無駄張り・技を無駄撃ちしないため）
+  if(s.buffs.innovation>0) v += Math.min(s.buffs.innovation,4)*SEARCH_W.bInnov;
+  if(s.buffs.greatStrides>0) v += SEARCH_W.bGS;
+  if(s.buffs.veneration>0 && remP>progReach) v += Math.min(s.buffs.veneration,4)*SEARCH_W.bVene;
+  v += Math.min(s.buffs.manipulation,8)*SEARCH_W.bManip;
+  if(s.buffs.muscleMemory>0 && remP>progReach) v += SEARCH_W.bMM;
+  if(s.buffs.expedience>0) v += SEARCH_W.bExp;
+  if(!s.tpUsed) v += SEARCH_W.rTP;
+  if(!s.hsUsed) v += SEARCH_W.rHS;
+  if(!s.qiUsed) v += SEARCH_W.rQI;
+  v += s.coLeft*SEARCH_W.rCO;
+  return v;
+}
+
+// expectimax本体: 行動ノード＝ビーム上位を深掘り、チャンスノード＝成功/失敗を確率加重
+function searchStep(s, depth){
+  if(s.finished || s.failed || depth<=0) return { v: evalSearch(s), id: null };
+  const cands = simCandidates(s);
+  if(!cands.length) return { v: evalSearch(s), id: null };
+  const scored = [];
+  for(const id of cands){
+    const a = A[id];
+    if(a.successRate!==undefined){
+      let rate = a.successRate;
+      if(s.condition==="centered") rate = Math.min(1, rate+0.25);
+      const ok = simApply(simClone(s), id, true);
+      const ng = simApply(simClone(s), id, false);
+      scored.push({ id, rate, ok, ng, e: rate*evalSearch(ok) + (1-rate)*evalSearch(ng) });
+    } else {
+      const ns = simApply(simClone(s), id, true);
+      scored.push({ id, ns, e: evalSearch(ns) });
+    }
+  }
+  scored.sort((x,y)=>y.e-x.e);
+  const isRoot = depth>=SEARCH_DEPTH;
+  // ルート直後の1遷移だけ本物のチャンスノード: 次ターンの状態変化8種を確率加重で展開する。
+  // これで「経過観察/設計変更で高品質を釣る」「高能率待ち」に正の期待値がつく（それより深い未来は通常扱い）
+  const childValue = (ns, d)=>{
+    if(isRoot && !ns.finished && !ns.failed && ns.condition==="normal"){
+      let ev = 0;
+      for(const [k,c] of Object.entries(CONDITIONS)){
+        const cs = simClone(ns); cs.condition = k;
+        ev += c.p * searchStep(cs, d).v;
+      }
+      return ev;
+    }
+    return searchStep(ns, d).v;
+  };
+  const width = isRoot ? SEARCH_BEAM.root : SEARCH_BEAM.inner;
+  let bestV = -Infinity, bestId = scored[0].id;
+  for(const c of scored.slice(0, width)){
+    const v = c.rate!==undefined
+      ? c.rate*childValue(c.ok, depth-1) + (1-c.rate)*childValue(c.ng, depth-1)
+      : childValue(c.ns, depth-1);
+    if(v>bestV){ bestV=v; bestId=c.id; }
+  }
+  return { v: bestV, id: bestId };
+}
+
+function recommendSearch(){
+  if(st.finished||st.failed) return null;
+  const res = searchStep(simClone(st), SEARCH_DEPTH);
+  if(res.id && canUse(A[res.id]))
+    return { id: res.id, reason: `先読み${SEARCH_DEPTH}手の期待値探索（v6）で最大値の手` };
+  return recommend(); // 探索が答えを出せない場合はv5ヒューリスティックに委譲
+}
+
+function recommendActive(){ return SEARCH_DEPTH>0 ? recommendSearch() : recommend(); }
+function applyDepth(){
+  SEARCH_DEPTH = +document.getElementById("in-depth").value || 0;
+  try{ localStorage.setItem("aqueduct-depth", String(SEARCH_DEPTH)); }catch(e){}
+  render();
 }
 
 /* ========= リカバリー入力 ========= */
@@ -1265,7 +1511,7 @@ function render(){
   } else { pickBox.style.display = "none"; }
 
   // おすすめ / 突貫の結果待ち
-  const rec = pendingRapid ? null : recommend();
+  const rec = (pendingRapid || st.awaitCond) ? null : recommendActive(); // 状態入力待ち中は探索を走らせない（v6は1手0.1〜0.5秒かかる）
   const recoCard = document.getElementById("recoCard");
   if(pendingRapid){
     recoCard.style.display="";
@@ -1501,6 +1747,15 @@ try{
   if(saved && saved.st && !saved.st.finished && (saved.st.step > 1 || saved.st.history.length > 0)){
     st = saved.st;
     if(saved.followMode) setMode(true);
+  }
+}catch(e){}
+// 思考の深さの復元（v6）
+try{
+  const d = localStorage.getItem("aqueduct-depth");
+  if(d !== null){
+    SEARCH_DEPTH = +d || 0;
+    const sel = document.getElementById("in-depth");
+    if(sel) sel.value = String(SEARCH_DEPTH);
   }
 }catch(e){}
 render();
