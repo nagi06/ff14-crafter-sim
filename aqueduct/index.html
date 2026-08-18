@@ -115,7 +115,7 @@
 </head>
 <body>
 <header>
-  <h1>ルインド・アクアダクト中間素材 製作支援・進化版 <span id="app-ver" style="font-size:0.78em; font-weight:700; color:var(--accent); border:1px solid var(--accent); border-radius:8px; padding:1px 9px; vertical-align:middle; white-space:nowrap;">v5.1</span></h1>
+  <h1>ルインド・アクアダクト中間素材 製作支援・進化版 <span id="app-ver" style="font-size:0.78em; font-weight:700; color:var(--accent); border:1px solid var(--accent); border-radius:8px; padding:1px 9px; vertical-align:middle; white-space:nowrap;">v5.2</span></h1>
   <!-- ※ app-ver はパッチのたびに手で上げる（コミットとセットで）。リロードでこの数字が変われば更新が来た合図 -->
   <div class="sub">部材/金属材/錬金樹脂 共通レシピ(rlvl776) 工数11250 / 品質31520 / 耐久60 ｜ 完成ライン品質31500 ｜ 前半マクロ＋後半手打ちのハイブリッド運用対応</div>
   <div class="tabs">
@@ -232,6 +232,9 @@
     </div>
   </div>
 
+  <div style="display:flex; justify-content:flex-end; margin:6px 0 4px;">
+    <button id="histCopyBtn" onclick="copyAllHist(this)" style="padding:6px 14px; border-radius:8px; border:1px solid var(--line); background:var(--panel2); color:var(--text); font-size:0.78rem;">履歴を全部コピー</button>
+  </div>
   <div class="history" id="historyBox">ここに履歴が表示されます</div>
 </div>
 
@@ -1304,6 +1307,26 @@ function render(){
     }).join("");
   }
   document.getElementById("undoBtn").disabled = undoStack.length===0;
+}
+
+function copyAllHist(btn){
+  // 表示と同じ形式で履歴全行（新しい順）をコピー。Claudeへの相談用
+  const text = st.history.map(h=>{
+    const cc = CONDITIONS[h.cond];
+    return `T${h.step} [${cc.name}] ${h.act} ${h.detail}${h.snap?` ｜${h.snap}`:""}`;
+  }).join("\n");
+  if(!text){ return; }
+  const done = ()=>{ const t=btn.textContent; btn.textContent="コピーした！"; setTimeout(()=>{btn.textContent="履歴を全部コピー";}, 1500); };
+  try{
+    navigator.clipboard.writeText(text).then(done, ()=>fallbackCopy(text, done));
+  }catch(e){ fallbackCopy(text, done); }
+}
+function fallbackCopy(text, done){
+  const ta = document.createElement("textarea");
+  ta.value = text; ta.style.position="fixed"; ta.style.opacity="0";
+  document.body.appendChild(ta); ta.select();
+  try{ document.execCommand("copy"); done(); }catch(e){}
+  document.body.removeChild(ta);
 }
 
 function undo(){
