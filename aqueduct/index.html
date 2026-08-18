@@ -115,7 +115,7 @@
 </head>
 <body>
 <header>
-  <h1>ルインド・アクアダクト中間素材 製作支援・進化版 <span id="app-ver" style="font-size:0.78em; font-weight:700; color:var(--accent); border:1px solid var(--accent); border-radius:8px; padding:1px 9px; vertical-align:middle; white-space:nowrap;">v5.3</span></h1>
+  <h1>ルインド・アクアダクト中間素材 製作支援・進化版 <span id="app-ver" style="font-size:0.78em; font-weight:700; color:var(--accent); border:1px solid var(--accent); border-radius:8px; padding:1px 9px; vertical-align:middle; white-space:nowrap;">v5.4</span></h1>
   <!-- ※ app-ver はパッチのたびに手で上げる（コミットとセットで）。リロードでこの数字が変われば更新が来た合図 -->
   <div class="sub">部材/金属材/錬金樹脂 共通レシピ(rlvl776) 工数11250 / 品質31520 / 耐久60 ｜ 完成ライン品質31500 ｜ 前半マクロ＋後半手打ちのハイブリッド運用対応</div>
   <div class="tabs">
@@ -1265,7 +1265,9 @@ function render(){
     document.getElementById("recoReason").textContent = "ゲーム画面に出ている状態変化を上のボタンで選ぶと、次のおすすめを出します";
   } else if(rec){
     recoCard.style.display="";
-    document.getElementById("recoAction").textContent = A[rec.id].name;
+    // v5.4: 推奨手のワンクリック実行（設計変更↔経過観察ミスクリック事件の根治）
+    document.getElementById("recoAction").innerHTML = A[rec.id].name +
+      ` <button onclick="doAction('${rec.id}')" style="margin-left:10px; padding:4px 16px; border-radius:8px; border:1px solid var(--accent); background:var(--accent); color:#1a1408; font-weight:700; font-size:0.8rem; cursor:pointer; vertical-align:middle;">この手を実行</button>`;
     document.getElementById("recoReason").textContent = rec.reason;
   } else {
     recoCard.style.display="none";
