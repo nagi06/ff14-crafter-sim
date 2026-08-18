@@ -115,7 +115,7 @@
 </head>
 <body>
 <header>
-  <h1>ルインド・アクアダクト中間素材 製作支援・進化版 <span id="app-ver" style="font-size:0.78em; font-weight:700; color:var(--accent); border:1px solid var(--accent); border-radius:8px; padding:1px 9px; vertical-align:middle; white-space:nowrap;">v6.1</span></h1>
+  <h1>ルインド・アクアダクト中間素材 製作支援・進化版 <span id="app-ver" style="font-size:0.78em; font-weight:700; color:var(--accent); border:1px solid var(--accent); border-radius:8px; padding:1px 9px; vertical-align:middle; white-space:nowrap;">v6.2</span></h1>
   <!-- ※ app-ver はパッチのたびに手で上げる（コミットとセットで）。リロードでこの数字が変われば更新が来た合図 -->
   <div class="sub">部材/金属材/錬金樹脂 共通レシピ(rlvl776) 工数11250 / 品質31520 / 耐久60 ｜ 完成ライン品質31500 ｜ 前半マクロ＋後半手打ちのハイブリッド運用対応</div>
   <div class="tabs">
@@ -678,7 +678,7 @@ function doAction(id){
 
   // ステップ経過処理
   pushHist(condKey, a.name, gainTxt(gainedP,gainedQ,failedRoll)+logTxt);
-  endStep(a);
+  endStep(a, failedRoll);
   render();
 }
 
@@ -690,7 +690,7 @@ function gainTxt(p,q,fail){
   return t.join(" ") || "";
 }
 
-function endStep(a){
+function endStep(a, failedRoll){
   // マニピュレーション回復（このステップで掛けた場合は回復しない）
   if(st.buffs.manipulation>0 && a.buff!=="manipulation" && st.durability>0){
     st.durability = Math.min(RECIPE.durability, st.durability+5);
@@ -700,7 +700,7 @@ function endStep(a){
   for(const k of Object.keys(st.buffs)){
     if(a.buff===k) continue;
     if(a.id==="muscleMemory" && k==="muscleMemory") continue;
-    if(a.id==="hastyTouch" && k==="expedience") continue; // 勢いは次のターンまで生かす
+    if(a.id==="hastyTouch" && k==="expedience" && !failedRoll) continue; // 勢いは成功時のみ次ターンまで生かす（失敗ターンで既存の勢いは切れる）
     if(st.buffs[k]>0) st.buffs[k]--;
   }
   st.lastAction = a.id;
@@ -1269,7 +1269,7 @@ function simApply(s, id, success){
     for(const k of Object.keys(st.buffs)){
       if(a.buff===k) continue;
       if(a.id==="muscleMemory" && k==="muscleMemory") continue;
-      if(a.id==="hastyTouch" && k==="expedience") continue;
+      if(a.id==="hastyTouch" && k==="expedience" && ok) continue; // doAction側endStepの「成功時のみ免除」と対
       if(st.buffs[k]>0) st.buffs[k]--;
     }
     st.lastAction = a.id;
