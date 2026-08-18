@@ -115,7 +115,7 @@
 </head>
 <body>
 <header>
-  <h1>ルインド・アクアダクト中間素材 製作支援・進化版 <span id="app-ver" style="font-size:0.78em; font-weight:700; color:var(--accent); border:1px solid var(--accent); border-radius:8px; padding:1px 9px; vertical-align:middle; white-space:nowrap;">v5.5</span></h1>
+  <h1>ルインド・アクアダクト中間素材 製作支援・進化版 <span id="app-ver" style="font-size:0.78em; font-weight:700; color:var(--accent); border:1px solid var(--accent); border-radius:8px; padding:1px 9px; vertical-align:middle; white-space:nowrap;">v5.6</span></h1>
   <!-- ※ app-ver はパッチのたびに手で上げる（コミットとセットで）。リロードでこの数字が変われば更新が来た合図 -->
   <div class="sub">部材/金属材/錬金樹脂 共通レシピ(rlvl776) 工数11250 / 品質31520 / 耐久60 ｜ 完成ライン品質31500 ｜ 前半マクロ＋後半手打ちのハイブリッド運用対応</div>
   <div class="tabs">
@@ -1058,6 +1058,21 @@ function recommendCore(){
     if(st.buffs.manipulation<=0 && st.durability<=25 && st.cp>=96+140)
       return r("manipulation","コンボ始動には耐久>10が要る。CPに余裕があるうちに耐久へ投資（耐久投資→コンボ回収）");
     if(st.buffs.innovation<=0 && st.cp>=18+32+24) return r("innovation","IQ10。イノベーションを掛けて品質を伸ばす");
+    // v5.6: ライバル戦法の移植（2026-08-18・crafter-navi実戦勝利33,997の解析より）
+    // ①一心不乱の解放: 0CPで集中加工を状態不問で1発確定。丸ごと腐らせていた資源
+    if(!st.hsUsed && !st.hsActive && st.buffs.innovation>0 && cond==="normal" && st.cp>=cpCost(A.preciseTouch)+30)
+      return r("heartAndSoul","一心不乱を解放！次の集中加工が状態不問で確定（イノベ込み約1,566）");
+    // ②GSブースター: GS中はギャンブルでGSを溶かさず確定タッチで回収
+    if(st.buffs.greatStrides>0 && st.buffs.innovation>0){
+      if((cond==="sturdy"||cond==="robust") && st.cp>=cpCost(A.preparatoryTouch) && st.durability>durCost(A.preparatoryTouch))
+        return r("preparatoryTouch","GS×下地加工200%＝約3,480！確定技でGSを回収");
+      if(st.hsActive && st.cp>=cpCost(A.preciseTouch)) return r("preciseTouch","GS×一心不乱の集中加工＝約2,610");
+      if(st.cp>=cpCost(A.prudentTouch) && st.durability>5)
+        return r("prudentTouch","GS×倹約加工＝約1,740。確定技でGSを回収（ギャンブルで溶かさない）");
+      if(st.cp>=cpCost(A.trainedFinesse)) return r("trainedFinesse","GS×神業＝約1,740。耐久0で確実にGS回収");
+    }
+    if(st.buffs.greatStrides<=0 && st.buffs.innovation>0 && cond==="normal" && st.cp>=200 && st.durability>10)
+      return r("greatStrides","中盤のGSブースト。次の確定タッチが2倍（32CPで最大+1,700級）");
     // グレスト祈り: 素のビエルゴでは届かないがGS+高品質なら届く域
     if(st.buffs.greatStrides>0 && remQ > by && st.buffs.innovation>0){
       if(cond==="normal" && st.coLeft>0) return r("carefulObservation","GSを維持したまま設計変更で高品質を釣る");
