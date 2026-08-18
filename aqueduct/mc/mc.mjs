@@ -7,20 +7,25 @@
 // 使い方:
 //   node mc.mjs --parity                                        # パリティ検証のみ
 //   node mc.mjs --runs 1000 --thresholds 100,120,140 --seed 42 --out results
+//   node mc.mjs --runs 5000 --brain search --depth 5 --jobs 10          # 並列実行（結果はシリアルと完全一致）
 //
 // index.html は一切変更しない (読み取り専用)。
 
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { Worker, isMainThread, parentPort, workerData } from "node:worker_threads";
+import { availableParallelism } from "node:os";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
+const __file = fileURLToPath(import.meta.url);
 const HTML_PATH = join(__dir, "..", "index.html");
 
 /* ================= CLI ================= */
 function parseArgs(argv) {
   const o = { runs: 1000, thresholds: [140], seed: 42, out: "results", parity: false, brain: "core",
-              depth: null, w: null, beam: null, simparity: 0 };
+              depth: null, w: null, beam: null, simparity: 0,
+              jobs: Math.max(1, Math.min(12, availableParallelism() - 2)) };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--parity") o.parity = true;
@@ -33,10 +38,12 @@ function parseArgs(argv) {
     else if (a === "--beam") { const [r, inn] = argv[++i].split(",").map(Number); o.beam = { root: r, inner: inn }; }
     else if (a === "--w") { const [k, v] = argv[++i].split("="); (o.w ??= {})[k] = parseFloat(v); } // 評価関数の重み上書き（繰り返し可）
     else if (a === "--simparity") o.simparity = parseInt(argv[++i], 10); // simApply vs doAction 差分テスト（Nプレイアウト）
+    else if (a === "--jobs") o.jobs = parseInt(argv[++i], 10); // 並列ワーカー数（1=シリアル。既定=論理コア-2）
     else throw new Error("unknown arg: " + a);
   }
   if (!["core", "safe", "search"].includes(o.brain)) throw new Error("--brain must be core|safe|search");
   if (!Number.isInteger(o.runs) || o.runs <= 0) throw new Error("--runs invalid");
+  if (!Number.isInteger(o.jobs) || o.jobs <= 0) throw new Error("--jobs invalid");
   if (o.thresholds.some((t) => !Number.isInteger(t))) throw new Error("--thresholds invalid");
   return o;
 }
@@ -224,6 +231,106 @@ function playOne(eng, threshold, seed, brain = "core") {
       (h) => `T${h.step} [${h.cond}] ${h.act} ${h.detail}${h.snap ? " | " + h.snap : ""}`
     ),
   };
+}
+
+/* ================= 並列実行 (worker_threads) =================
+   run i のシードは seedBase+i 固定なので、ワーカー分割の仕方に関係なく
+   シリアル実行と完全に同一の結果列になる (--jobs 1 との突合で等価性を検証済みにできる)。
+   ワーカーは集計に必要なコンパクト結果のみ返し、トレース(履歴全文)はクラスごと上位3本だけ持ち帰る。 */
+function compactResult(r, i) {
+  return {
+    i, seed: r.seed, threshold: r.threshold, outcome: r.outcome, detail: r.detail, phase: r.phase,
+    step: r.step, progress: r.progress, quality: r.quality, durability: r.durability, cp: r.cp,
+    qShort: r.qShort, manipLeft: r.manipLeft, last3: r.last3, fails: r.fails, finished: r.finished,
+    actsStr: r.actions.join(","),
+  };
+}
+function traceObj(r) {
+  return {
+    threshold: r.threshold, seed: r.seed, outcome: r.outcome, detail: r.detail,
+    final: { step: r.step, progress: r.progress, quality: r.quality, durability: r.durability, cp: r.cp, iqManipLeft: r.manipLeft },
+    actions: r.actions,
+    history: r.history,
+  };
+}
+
+const PROGRESS_EVERY = 20; // ワーカー→親への進捗通知粒度 (run数)
+
+function workerMain() {
+  const { tasks, seedBase, brain, depth, w, beam } = workerData;
+  const eng = loadEngine();
+  if (depth !== null) eng.searchDepth = depth;
+  if (w) eng.searchW = w;
+  if (beam) eng.searchBeam = beam;
+  const results = [];
+  const traces = {};
+  let sinceNotify = 0;
+  for (const t of tasks) {
+    for (let i = t.start; i < t.end; i++) {
+      const r = playOne(eng, t.thr, seedBase + i, brain);
+      results.push(compactResult(r, i));
+      const cls = traceClass(r);
+      if (!traces[cls]) traces[cls] = [];
+      if (traces[cls].length < 3) traces[cls].push(traceObj(r));
+      if (++sinceNotify >= PROGRESS_EVERY) { parentPort.postMessage({ type: "progress", done: sinceNotify }); sinceNotify = 0; }
+    }
+  }
+  parentPort.postMessage({ type: "done", done: sinceNotify, results, traces });
+}
+
+// 全 (threshold × run範囲) をワーカーに分配して回収する。戻り値: Map(thr -> i順の結果配列) とマージ済みトレース
+function runAllParallel(opt) {
+  return new Promise((resolve, reject) => {
+    const totalRuns = opt.runs * opt.thresholds.length;
+    const jobs = Math.min(opt.jobs, opt.runs);
+    // 分配: 各閾値の [0,runs) を jobs 個の連続チャンクに割り、ワーカー j が全閾値のチャンク j を担当
+    const workerTasks = Array.from({ length: jobs }, () => []);
+    for (const thr of opt.thresholds) {
+      for (let j = 0; j < jobs; j++) {
+        const start = Math.floor((opt.runs * j) / jobs);
+        const end = Math.floor((opt.runs * (j + 1)) / jobs);
+        if (end > start) workerTasks[j].push({ thr, start, end });
+      }
+    }
+    const resultsByThr = new Map(opt.thresholds.map((t) => [t, []]));
+    const traces = {};
+    let doneRuns = 0, doneWorkers = 0, lastPct = -5;
+    const T0 = Date.now();
+    const workers = [];
+    const onProgress = (n) => {
+      doneRuns += n;
+      const pct = (doneRuns / totalRuns) * 100;
+      if (pct - lastPct >= 5 || doneRuns === totalRuns) {
+        lastPct = pct;
+        const el = (Date.now() - T0) / 1000;
+        const eta = doneRuns > 0 ? el * (totalRuns - doneRuns) / doneRuns : 0;
+        console.log(`  progress: ${doneRuns}/${totalRuns} (${pct.toFixed(1)}%) elapsed ${el.toFixed(0)}s ETA ${eta.toFixed(0)}s`);
+      }
+    };
+    for (let j = 0; j < jobs; j++) {
+      const wk = new Worker(__file, {
+        workerData: { tasks: workerTasks[j], seedBase: opt.seed, brain: opt.brain, depth: opt.depth, w: opt.w, beam: opt.beam },
+      });
+      workers.push(wk);
+      wk.on("message", (msg) => {
+        if (msg.type === "progress") { onProgress(msg.done); return; }
+        if (msg.type === "done") {
+          onProgress(msg.done);
+          for (const r of msg.results) resultsByThr.get(r.threshold).push(r);
+          for (const [cls, ts] of Object.entries(msg.traces)) {
+            if (!traces[cls]) traces[cls] = [];
+            for (const t of ts) if (traces[cls].length < 3) traces[cls].push(t);
+          }
+          if (++doneWorkers === jobs) {
+            for (const arr of resultsByThr.values()) arr.sort((a, b) => a.i - b.i);
+            resolve({ resultsByThr, traces });
+          }
+        }
+      });
+      wk.on("error", (e) => { for (const w2 of workers) w2.terminate(); reject(e); });
+      wk.on("exit", (code) => { if (code !== 0 && doneWorkers < jobs) reject(new Error("worker exited with code " + code)); });
+    }
+  });
 }
 
 /* ================= パリティ検証 (実機実測との一致) ================= */
@@ -445,7 +552,7 @@ function traceClass(r) {
 }
 
 /* ================= メイン ================= */
-function main() {
+async function main() {
   const opt = parseArgs(process.argv.slice(2));
   const eng = loadEngine();
 
@@ -477,53 +584,35 @@ function main() {
   mkdirSync(outDir, { recursive: true });
 
   const summaries = [];
-  const traces = {}; // class -> up to 3 representative traces
   // CRNペア差用: 閾値ごとに軽量化した結果 (quality/finished/outcome/step) を保持
   const slimByThr = new Map();
   const T0 = Date.now();
 
-  try {
-    for (const thr of opt.thresholds) {
-      const results = [];
-      const jsonl = [];
-      for (let i = 0; i < opt.runs; i++) {
-        // 共通乱数法: run i のシードは seedBase+i で全閾値共通 (閾値間比較の分散低減)
-        const r = playOne(eng, thr, opt.seed + i, opt.brain);
-        results.push(r);
-        jsonl.push(JSON.stringify({
-          seed: r.seed, thr: r.threshold, outcome: r.outcome, detail: r.detail, phase: r.phase,
-          step: r.step, prog: r.progress, qual: r.quality, dur: r.durability, cp: r.cp,
-          qShort: r.qShort, manip: r.manipLeft, last3: r.last3.join(">"),
-          fails: `${r.fails.hastyTouch}/${r.fails.daringTouch}/${r.fails.rapidSynth}`,
-          acts: r.actions.join(","),
-        }));
-        const cls = traceClass(r);
-        if (!traces[cls]) traces[cls] = [];
-        if (traces[cls].length < 3) {
-          traces[cls].push({
-            threshold: r.threshold, seed: r.seed, outcome: r.outcome, detail: r.detail,
-            final: { step: r.step, progress: r.progress, quality: r.quality, durability: r.durability, cp: r.cp, iqManipLeft: r.manipLeft },
-            actions: r.actions,
-            history: r.history,
-          });
-        }
-      }
-      writeFileSync(join(outDir, `runs_${thr}.jsonl`), jsonl.join("\n") + "\n", "utf8");
-      slimByThr.set(thr, results.map((r) => ({ quality: r.quality, finished: r.finished, outcome: r.outcome, step: r.step })));
-      const s = summarize(thr, results);
-      summaries.push(s);
-      const topCauses = Object.entries(s.causes).sort((a, b) => b[1] - a[1]).slice(0, 5);
-      console.log(
-        `thr=${thr}: finish ${(s.finishRate * 100).toFixed(1)}% ` +
-        `qualMean=${s.quality.mean.toFixed(0)} qualMed=${s.quality.median} qualMax=${s.quality.max} | ` +
-        `win ${s.wins}/${s.runs} (95%CI ${(s.wilson95[0] * 100).toFixed(2)}-${(s.wilson95[1] * 100).toFixed(2)}%) | ` +
-        `artifacts ${s.harnessArtifacts.count} (${(s.harnessArtifacts.share * 100).toFixed(1)}%) avgSteps=${s.avgSteps.toFixed(1)}`
-      );
-      console.log("  causes(genuine, top5): " + JSON.stringify(Object.fromEntries(topCauses)));
-      if (s.harnessArtifacts.count > 0) console.log("  harness artifacts: " + JSON.stringify(s.harnessArtifacts.causes));
-    }
-  } finally {
-    Math.random = ORIG_RANDOM;
+  console.log(`=== running ${opt.runs} runs x ${opt.thresholds.length} threshold(s), jobs=${opt.jobs} ===`);
+  const { resultsByThr, traces } = await runAllParallel(opt);
+
+  for (const thr of opt.thresholds) {
+    const results = resultsByThr.get(thr);
+    const jsonl = results.map((r) => JSON.stringify({
+      seed: r.seed, thr: r.threshold, outcome: r.outcome, detail: r.detail, phase: r.phase,
+      step: r.step, prog: r.progress, qual: r.quality, dur: r.durability, cp: r.cp,
+      qShort: r.qShort, manip: r.manipLeft, last3: r.last3.join(">"),
+      fails: `${r.fails.hastyTouch}/${r.fails.daringTouch}/${r.fails.rapidSynth}`,
+      acts: r.actsStr,
+    }));
+    writeFileSync(join(outDir, `runs_${thr}.jsonl`), jsonl.join("\n") + "\n", "utf8");
+    slimByThr.set(thr, results.map((r) => ({ quality: r.quality, finished: r.finished, outcome: r.outcome, step: r.step })));
+    const s = summarize(thr, results);
+    summaries.push(s);
+    const topCauses = Object.entries(s.causes).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    console.log(
+      `thr=${thr}: finish ${(s.finishRate * 100).toFixed(1)}% ` +
+      `qualMean=${s.quality.mean.toFixed(0)} qualMed=${s.quality.median} qualMax=${s.quality.max} | ` +
+      `win ${s.wins}/${s.runs} (95%CI ${(s.wilson95[0] * 100).toFixed(2)}-${(s.wilson95[1] * 100).toFixed(2)}%) | ` +
+      `artifacts ${s.harnessArtifacts.count} (${(s.harnessArtifacts.share * 100).toFixed(1)}%) avgSteps=${s.avgSteps.toFixed(1)}`
+    );
+    console.log("  causes(genuine, top5): " + JSON.stringify(Object.fromEntries(topCauses)));
+    if (s.harnessArtifacts.count > 0) console.log("  harness artifacts: " + JSON.stringify(s.harnessArtifacts.causes));
   }
 
   // CRNペア差統計 (閾値間比較の本命。周辺CIの見比べは分散が大きすぎて差が埋もれる)
@@ -573,6 +662,7 @@ function main() {
       brain: opt.brain,
       player: { craft: 5799, control: 5637, maxCP: 791 },
       runsPerThreshold: opt.runs,
+      jobs: opt.jobs,
       seedBase: opt.seed,
       thresholds: opt.thresholds,
       turnCap: TURN_CAP,
@@ -589,4 +679,5 @@ function main() {
   console.log(`done in ${((Date.now() - T0) / 1000).toFixed(1)}s -> ${outDir}`);
 }
 
-main();
+if (isMainThread) await main();
+else workerMain();
