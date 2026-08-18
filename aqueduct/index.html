@@ -115,7 +115,7 @@
 </head>
 <body>
 <header>
-  <h1>ルインド・アクアダクト中間素材 製作支援・進化版 <span id="app-ver" style="font-size:0.78em; font-weight:700; color:var(--accent); border:1px solid var(--accent); border-radius:8px; padding:1px 9px; vertical-align:middle; white-space:nowrap;">v5.4</span></h1>
+  <h1>ルインド・アクアダクト中間素材 製作支援・進化版 <span id="app-ver" style="font-size:0.78em; font-weight:700; color:var(--accent); border:1px solid var(--accent); border-radius:8px; padding:1px 9px; vertical-align:middle; white-space:nowrap;">v5.5</span></h1>
   <!-- ※ app-ver はパッチのたびに手で上げる（コミットとセットで）。リロードでこの数字が変われば更新が来た合図 -->
   <div class="sub">部材/金属材/錬金樹脂 共通レシピ(rlvl776) 工数11250 / 品質31520 / 耐久60 ｜ 完成ライン品質31500 ｜ 前半マクロ＋後半手打ちのハイブリッド運用対応</div>
   <div class="tabs">
@@ -342,18 +342,19 @@ const RECIPE = {
 };
 
 /* ========= 状態変化定義 =========
-   出現率は2026-08-18の実機ミラー実測（部材48T・44サンプル）を旧推定とブレンドした値。
-   実測: 頑強16%・頑丈20%・高品質7%・高進捗7%・通常23%・高能率14%・安定11%・長持続9%
-   → 頑丈系がターンの4割前後（頑強翌の確定頑丈込み）。高品質は旧推定の半分しか出ない */
+   出現率は2026-08-18実戦8本・352サンプルの実測（自然出現のみ。頑強翌の確定頑丈42件は除外して集計）。
+   旧44サンプル校正は強制頑丈を自然出現に混ぜて数えていたため頑丈17%と過大だった（実際の自然出現は8.5%）。
+   安定は14.8%（旧推定10%・z=3.0で有意）→ 85%ヘイスティのチャンスが想定の1.5倍。ギャンブル成功率は
+   140回の実測で全カテゴリ仕様通り（突貫48.8%/50、ヘイスティ系54.2%/60、安定時は上振れ）＝乱数は潔白 */
 const CONDITIONS = {
-  normal:    {name:"通常",   color:"#c8ccd8", p:0.21, desc:"特別な効果はない"},
-  good:      {name:"高品質", color:"#e85d5d", p:0.10, desc:"品質1.75倍（コスモツール効果） ／ 秘訣・集中加工・集中作業が使える"},
-  malleable: {name:"高進捗", color:"#7ec8f0", p:0.09, desc:"進捗1.5倍 ／ 作業系を撃つチャンス"},
-  pliant:    {name:"高能率", color:"#8de0a8", p:0.14, desc:"CP消費が半分 ／ 重いバフを撃つチャンス"},
-  sturdy:    {name:"頑丈",   color:"#6a8ff0", p:0.17, desc:"耐久消費が半分 ／ 耐久10の技を撃つチャンス"},
-  robust:    {name:"頑強",   color:"#3f6ce0", p:0.10, desc:"耐久消費が半分＋次ターンは必ず頑丈（半減2連チャンス）"},
-  centered:  {name:"安定",   color:"#f0e06a", p:0.10, desc:"成功率+25%（突貫作業などに影響）"},
-  primed:    {name:"長持続", color:"#c98fe8", p:0.09, desc:"このターンに使ったバフの持続+2"},
+  normal:    {name:"通常",   color:"#c8ccd8", p:0.20, desc:"特別な効果はない"},
+  good:      {name:"高品質", color:"#e85d5d", p:0.08, desc:"品質1.75倍（コスモツール効果） ／ 秘訣・集中加工・集中作業が使える"},
+  malleable: {name:"高進捗", color:"#7ec8f0", p:0.10, desc:"進捗1.5倍 ／ 作業系を撃つチャンス"},
+  pliant:    {name:"高能率", color:"#8de0a8", p:0.15, desc:"CP消費が半分 ／ 重いバフを撃つチャンス"},
+  sturdy:    {name:"頑丈",   color:"#6a8ff0", p:0.09, desc:"耐久消費が半分 ／ 耐久10の技を撃つチャンス"},
+  robust:    {name:"頑強",   color:"#3f6ce0", p:0.12, desc:"耐久消費が半分＋次ターンは必ず頑丈（半減2連チャンス）"},
+  centered:  {name:"安定",   color:"#f0e06a", p:0.15, desc:"成功率+25%（突貫・ヘイスティ・デアリングに影響）"},
+  primed:    {name:"長持続", color:"#c98fe8", p:0.11, desc:"このターンに使ったバフの持続+2"},
 };
 function isGoodish(c){ return c==="good"; }
 
