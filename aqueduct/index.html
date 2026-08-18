@@ -115,7 +115,7 @@
 </head>
 <body>
 <header>
-  <h1>ルインド・アクアダクト中間素材 製作支援・進化版 <span id="app-ver" style="font-size:0.62em; font-weight:700; color:var(--accent); border:1px solid var(--accent); border-radius:8px; padding:1px 8px; vertical-align:middle; white-space:nowrap;">v4.1</span></h1>
+  <h1>ルインド・アクアダクト中間素材 製作支援・進化版 <span id="app-ver" style="font-size:0.78em; font-weight:700; color:var(--accent); border:1px solid var(--accent); border-radius:8px; padding:1px 9px; vertical-align:middle; white-space:nowrap;">v4.2</span></h1>
   <!-- ※ app-ver はパッチのたびに手で上げる（コミットとセットで）。リロードでこの数字が変われば更新が来た合図 -->
   <div class="sub">部材/金属材/錬金樹脂 共通レシピ(rlvl776) 工数11250 / 品質31520 / 耐久60 ｜ 完成ライン品質31500 ｜ 前半マクロ＋後半手打ちのハイブリッド運用対応</div>
   <div class="tabs">
@@ -737,6 +737,8 @@ function recommend(){
   // 本命が撃てない/死ぬ場合: 延命・代替手
   // v4: 匠の絶技は〆専用に温存するため延命候補の最後尾へ（緊急消費が〆崩壊の主因だった）
   for(const id of ["manipulation","mastersMend","immaculateMend","trainedFinesse","tricks","observe","carefulObservation","prudentTouch","hastyTouch","basicTouch","byregot","trainedPerfection","carefulSynth","basicSynth"]){
+    // v4.2: マニピュ残2T以上での上書き張り直しは96CPのドブ捨て（実戦2本目T9/T11事件）。メンド系に譲る
+    if(id==="manipulation" && st.buffs.manipulation>1) continue;
     if(canUse(A[id]) && !wouldDie(id)) return {id, reason:"（安全手）本命だと耐久0で失敗するため、延命できる手・実行可能な手から提案"};
   }
   for(const id of ["carefulSynth","basicSynth","rapidSynth"]){
@@ -907,12 +909,35 @@ function recommendCore(){
       return r("byregot","高品質×ビエルゴ！1.75倍が乗る最大の一撃で仕上げる");
     // v4: 秘訣(+20)は集中加工(約2,700品質)より弱いトレード。本当にCPが底の時だけ
     if(st.cp < 60 && remQ > by*1.75) return r("tricks","高品質だがCPが底。秘訣で+20回収してビエルゴ資金に");
-    if(st.cp>=cpCost(A.preciseTouch)) return r("preciseTouch","高品質は集中加工（150%×1.75、IQ+2）。品質/CP効率が全技で最強");
-    return r("tricks","集中加工すら撃てない。秘訣でCP+20回収");
+    if(st.cp>=cpCost(A.preciseTouch) && st.durability>durCost(A.preciseTouch))
+      return r("preciseTouch","高品質は集中加工（150%×1.75、IQ+2）。品質/CP効率が全技で最強");
+    return r("tricks","集中加工がCPか耐久で撃てない。秘訣+20で回収し、マニピュ/メンドは次の通常ターンで");
   }
   // ヘイスティ成功の勢い: デアリングタッチ(CP0・150%)は逃さない
   if(st.buffs.expedience>0 && !isGoodish(cond) && st.durability>durCost(A.daringTouch))
     return r("daringTouch","ヘイスティ成功の勢い！デアリングタッチ(CP0・効率150%・成功率60%)はタダで振れる大サイコロ");
+
+  // === フィニッシュCP予約（v4.2）: 品質未達でも〆コンボ代（ヴェネ18+下地18×2=54・絶技前提）は死守 ===
+  // seed597事件: 品質31,520(キャップ)に到達したのにCP3で〆が打てず工数853残しで耐久死。予約ライン以下では
+  // 「出し切りビエルゴ→0CP技で品質ガチャ→届いたら温存した54CPで〆」に切り替える
+  const finReserve = st.tpUsed ? 90 : 54;
+  // 射程ゲート: 高品質ビエルゴ＋ヘイスティ数発で31,500に届く圏内のときだけ〆予約を発動。
+  // 射程外で予約しても勝ち筋がない（完走・品質未達＝同じ負け）ので、品質の尻尾を伸ばす方に賭ける
+  const strikeQ = Math.floor(byregotEstimate()*1.75) + 1500;
+  if(st.cp <= finReserve + 30 && remQ <= strikeQ){
+    if(st.iq>=6 && st.buffs.innovation<=0 && !st.qiUsed)
+      return r("quickInnovation","出し切り前に0CPのクイックイノベを乗せる（ビエルゴ1.5倍）");
+    if(st.iq>=6 && st.durability>10 && st.cp>=cpCost(A.byregot)+finReserve)
+      return r("byregot","CPが〆予約ライン("+finReserve+")接近。ここでビエルゴを出し切る（以降は0CP技と〆のみ）");
+    if(st.buffs.expedience>0 && st.durability>durCost(A.daringTouch)) return r("daringTouch","予約ライン下は0CP技のみ。デアリング(150%)");
+    if(st.durability>durCost(A.hastyTouch)+22)
+      return r("hastyTouch","〆代"+finReserve+"CPを温存して0CPヘイスティで品質ガチャ（ラインに届いた瞬間〆コンボへ）");
+    if(st.buffs.veneration<=0 && st.cp>=36) return r("veneration","粘り終了。〆コンボ（ヴェネ→絶技下地→下地）で完走へ");
+    if(!st.tpUsed && st.durability<=durCost(A.groundwork)) return r("trainedPerfection","絶技解禁。次の下地を耐久消費0で");
+    if((st.durability>durCost(A.groundwork)||st.tpReady) && st.cp>=cpCost(A.groundwork))
+      return r("groundwork","〆の下地作業で完走へ");
+    if(st.cp>=cpCost(A.carefulSynth) && st.durability>durCost(A.carefulSynth)) return r("carefulSynth","模範で刻んで完走へ");
+  }
 
   // CP終端の手仕舞い: ビエルゴを撃たずにCPが尽きるのが最悪
   if(st.iq>=6 && st.cp < 70 && st.durability>10 && st.cp>=cpCost(A.byregot)){
