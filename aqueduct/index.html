@@ -811,6 +811,19 @@ function recommendCore(){
       if(st.durability>gwCost) return r("groundwork","確信＋ヴェネレーションが乗るうちに下地作業で大きく進める"+(cond==="malleable"?"（高進捗でさらに1.5倍！）":""));
       return r("carefulSynth","耐久が心もとないので模範作業で確実に（確信は乗る）");
     }
+    // === 開幕押し切り（v4.1 2026-08-18実戦反省）===
+    // 打ち止めライン(約3,500)までは高進捗を待たずに工数を押し切る。高進捗9%は10ターン来ないのが普通にあり、
+    // 待つと品質フェーズの資源で工数を払う羽目になる（T4品質転向→終盤突貫連打事件）
+    const pushLine = Math.floor(baseProg()*5.4)*2;
+    if(remP > pushLine){
+      const gwC2 = durCost(A.groundwork);
+      if(st.buffs.veneration<=0 && st.cp>=18+cpCost(A.groundwork))
+        return r("veneration","工数が打ち止めライン("+pushLine.toLocaleString()+")より上。ヴェネを張って押し切る（高進捗は待たない）");
+      if(st.durability>gwC2 && st.cp>=cpCost(A.groundwork) && remP > progGain(A.groundwork)+400)
+        return r("groundwork","打ち止めラインまで下地作業で押し切る"+(cond==="sturdy"||cond==="robust"?"（頑丈で耐久半額！）":cond==="malleable"?"（高進捗1.5倍！）":""));
+      if(st.cp>=cpCost(A.carefulSynth) && remP > progGain(A.carefulSynth)+100 && st.durability>durCost(A.carefulSynth))
+        return r("carefulSynth","下地だと耐久が持たない。模範作業で打ち止めラインまで押す");
+    }
     // === 状態収穫スタイル（前半マクロ後の中間状態） ===
     // 工数は高進捗ターンで稼ぎ、頑丈/頑強・高品質・通常は品質とIQの収穫に回す（80%時代のヴェネ連打はしない）
     if(cond==="malleable"){
@@ -846,6 +859,9 @@ function recommendCore(){
     if(st.iq<10 && st.buffs.wasteNot<=0 && st.durability>5 && st.cp>=cpCost(A.prudentTouch))
       return r("prudentTouch","通常系ターンは倹約加工(耐久5)でIQ収穫。工数は高進捗ターンで稼ぐ");
     // IQ10以降の品質サイクル（工数は高進捗と〆コンボに任せる。CPは〆予算を残す）
+    // v4.1: 耐久投資→コンボ回収の順番。コンボは耐久>10が始動条件なので、CP潤沢なうちに耐久を厚くする
+    if(st.iq>=10 && st.buffs.manipulation<=0 && st.durability<=25 && st.cp>=96+140)
+      return r("manipulation","コンボ始動には耐久>10が要る。CPに余裕があるうちに耐久へ投資（耐久投資→コンボ回収）");
     if(st.iq>=10 && st.buffs.innovation<=0 && st.cp>=18+56)
       return r("innovation","IQ10。イノベーションを張って品質サイクル(タッチ1.5倍)へ");
     if(st.buffs.expedience>0 && st.durability>durCost(A.daringTouch))
@@ -944,6 +960,9 @@ function recommendCore(){
     if(st.durability>durCost(A.hastyTouch)) return r("hastyTouch","CPが尽きた。ヘイスティタッチ(CP0・成功率60%)でIQガチャ。成功すればデアリングも");
   } else {
     // IQ10: イノベを維持して絶技/集中で品質を伸ばし、最後は必ずビエルゴ
+    // v4.1: 耐久投資→コンボ回収の順番（コンボは耐久>10が始動条件）
+    if(st.buffs.manipulation<=0 && st.durability<=25 && st.cp>=96+140)
+      return r("manipulation","コンボ始動には耐久>10が要る。CPに余裕があるうちに耐久へ投資（耐久投資→コンボ回収）");
     if(st.buffs.innovation<=0 && st.cp>=18+32+24) return r("innovation","IQ10。イノベーションを掛けて品質を伸ばす");
     // グレスト祈り: 素のビエルゴでは届かないがGS+高品質なら届く域
     if(st.buffs.greatStrides>0 && remQ > by && st.buffs.innovation>0){
