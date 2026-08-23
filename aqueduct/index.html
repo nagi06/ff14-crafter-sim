@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>ルインド・アクアダクト中間素材 製作支援・進化版（前半マクロ＋手打ち）</title>
+<title>ルインド・アクアダクト中間素材 製作支援・進化版</title>
 <style>
   :root{
     --bg:#12141a; --panel:#1c1f28; --panel2:#252936; --line:#343a4d;
@@ -115,11 +115,10 @@
 </head>
 <body>
 <header>
-  <h1>ルインド・アクアダクト中間素材 製作支援・進化版 <span id="app-ver" style="font-size:0.78em; font-weight:700; color:var(--accent); border:1px solid var(--accent); border-radius:8px; padding:1px 9px; vertical-align:middle; white-space:nowrap;">v6.4</span></h1>
+  <h1>ルインド・アクアダクト中間素材 製作支援・進化版 <span id="app-ver" style="font-size:0.78em; font-weight:700; color:var(--accent); border:1px solid var(--accent); border-radius:8px; padding:1px 9px; vertical-align:middle; white-space:nowrap;">v6.5</span></h1>
   <!-- ※ app-ver はパッチのたびに手で上げる（コミットとセットで）。リロードでこの数字が変われば更新が来た合図 -->
-  <div class="sub">部材/金属材/錬金樹脂 共通レシピ(rlvl776) 工数11250 / 品質31520 / 耐久60 ｜ 完成ライン品質31500 ｜ 前半マクロ＋後半手打ちのハイブリッド運用対応</div>
+  <div class="sub">部材/金属材/錬金樹脂 共通レシピ(rlvl776) 工数11250 / 品質31520 / 耐久60 ｜ 完成ライン品質31500 ｜ 全手打ち＋先読み推奨エンジン(v6)</div>
   <div class="tabs">
-    <button id="tab-macro" onclick="showPage('macro')">前半マクロ</button>
     <button id="tab-sim" class="active" onclick="showPage('sim')">製作</button>
     <button id="tab-guide" onclick="showPage('guide')">手順ガイド</button>
     <button id="tab-set" onclick="showPage('set')">設定</button>
@@ -127,23 +126,6 @@
 </header>
 
 <main>
-<!-- ============ 前半マクロページ ============ -->
-<div id="page-macro" class="page">
-  <div class="bars" style="margin-bottom:10px;">
-    <p style="font-size:0.78rem; line-height:1.7; color:var(--sub);">
-    判断が要らない<b style="color:var(--text)">序盤（工数フェーズ＋IQ積み）だけをマクロ化</b>し、勝負どころ（グレスト祈り・高品質1.75倍ビエルゴ・最終工数）を手打ちに残す設計。
-    マクロは通常状態前提の控えめ見積りなので、道中の状態ボーナスはそのまま上振れになる。<br>
-    <b style="color:var(--warn)">使い方:</b> ①下でマクロ生成→ゲームで実行 ②終わったら「製作」タブの<b style="color:var(--accent2)">リカバリー入力</b>にゲームの実値を入れて同期 ③実機モードで手打ち続行</p>
-  </div>
-  <div class="rec-grid" style="margin-bottom:10px;">
-    <div><label>工数目標（%）<br><span style="font-size:0.6rem;">高進捗ターンを工数収穫に使う余白。既定70</span></label><input type="number" id="mc-progpct" value="70" min="60" max="88"></div>
-    <div><label>手動用に残すCP<br><span style="font-size:0.6rem;">グレスト祈り・ビエルゴ・〆の予算。既定260</span></label><input type="number" id="mc-reserve" value="260" min="100" max="500"></div>
-    <div style="grid-column:1/3;"><label style="display:flex; align-items:center; gap:6px; font-size:0.75rem;"><input type="checkbox" id="mc-quality" style="width:18px;height:18px;">IQ積み（倹約加工）もマクロに含める ※既定オフ: IQは手動フェーズの状態収穫（下地/集中/ヘイスティ）で積む方がCP効率が良い</label></div>
-  </div>
-  <button onclick="buildOpeningMacro()" style="width:100%; padding:12px 0; border:none; border-radius:10px; background:var(--accent); color:#1a1408; font-weight:700; font-size:0.95rem;">前半マクロを生成</button>
-  <div id="macroOut" style="margin-top:12px;"></div>
-</div>
-
 <!-- ============ 製作ページ ============ -->
 <div id="page-sim" class="page active">
   <div id="resultBox" class="result"></div>
@@ -1640,110 +1622,13 @@ function updateBaseline(){
   if(el) el.textContent = `開始CP ${cp} ／ 工数100%＝${bp} ／ 品質100%＝${bq}（IQ0素点）`;
 }
 function showPage(p){
-  for(const x of ["macro","sim","guide","set"]){
+  for(const x of ["sim","guide","set"]){
     document.getElementById("page-"+x).classList.toggle("active", x===p);
     document.getElementById("tab-"+x).classList.toggle("active", x===p);
   }
 }
 
-/* ========= 前半マクロビルダー ========= */
-let lastMacroPlan = null;
-function buildOpeningMacro(){
-  readSettings();
-  const bp = baseProg(), bq = baseQual(), cpMax = maxCP();
-  const pct = Math.max(60, Math.min(88, +document.getElementById("mc-progpct").value || 70));
-  const reserve = Math.max(100, Math.min(500, +document.getElementById("mc-reserve").value || 260));
-  const withQ = document.getElementById("mc-quality").checked;
-  const target = Math.floor(RECIPE.difficulty * pct / 100);
-  const budget = cpMax - reserve;
-
-  const acts = [];
-  let cum = 0, qsum = 0, cp = 0, d = RECIPE.durability, manip = 0, vene = 0, mm = 0, iqN = 0;
-  // 1アクション実行: バフ消化とマニピュ回復も追う（通常状態前提の控えめ見積り）
-  const doA = (n, c, du, gainP, gainQ)=>{
-    acts.push(n); cp += c;
-    if(du > 0) d -= du;
-    if(gainP){ cum += gainP; if(n !== "確信" && mm > 0) mm = 0; } // 確信バフは最初の作業1回で消費（練習モード実測で検証済み）
-    if(gainQ) qsum += gainQ;
-    if(n !== "マニピュレーション" && manip > 0 && d > 0){ d = Math.min(RECIPE.durability, d + 5); manip--; }
-    if(n !== "ヴェネレーション" && vene > 0) vene--;
-    if(n !== "確信" && mm > 0) mm--;
-  };
-  const gwGain = ()=>Math.floor(bp * 3.6 * (1 + (vene>0?0.5:0) + (mm>0?1.0:0)));
-  const psGain = ()=>Math.floor(bp * 1.8 * (1 + (vene>0?0.5:0)));
-
-  // 工数フェーズ: 確信→マニピュ→ヴェネ→下地×n→倹約作業で刻む（targetを超える手前で停止）
-  doA("確信", 6, 10, Math.floor(bp*3)); mm = 5;
-  doA("マニピュレーション", 96, 0, 0); manip = 8;
-  doA("ヴェネレーション", 18, 0, 0); vene = 4;
-  let guard = 0;
-  while(guard++ < 30){
-    if(cp >= budget - 18) break;
-    if(vene <= 0 && cum + Math.floor(bp*1.8) < target){ doA("ヴェネレーション", 18, 0, 0); vene = 4; continue; }
-    const gw = gwGain();
-    if(d > 25 && cum + gw <= target){ doA("下地作業", 18, 20, gw); continue; }
-    const ps = psGain();
-    if(d > 10 && cum + ps <= target){ doA("倹約作業", 18, 5, ps); continue; }
-    break;
-  }
-  // IQ積みフェーズ（任意）: 倹約加工でIQを積む。品質の勝負はしない（数字はオマケ）
-  if(withQ){
-    guard = 0;
-    while(iqN < 10 && guard++ < 12){
-      if(cp + 25 > budget) break;
-      if(d <= 15) break; // 手動パートに耐久15以上を残す
-      doA("倹約加工", 25, 5, 0, Math.floor(bq * (1 + 0.1*iqN)));
-      iqN++;
-    }
-  }
-
-  lastMacroPlan = {progress:cum, quality:qsum, dur:Math.max(1,d), cp:cpMax - cp, iq:iqN,
-                   step:acts.length + 1, vene, manip};
-  // 出力
-  const lines = acts.map(n=>`/ac ${n} <wait.3>`);
-  const chunks = [];
-  for(let i=0; i<lines.length; i+=14) chunks.push(lines.slice(i, i+14));
-  let html = `<div class="bars" style="font-size:0.78rem; line-height:1.8;">
-    見込み: 工数 <b>${cum.toLocaleString()}</b> / ${RECIPE.difficulty.toLocaleString()}（${pct}%目標）
-    ／ 品質 <b>${qsum.toLocaleString()}</b> ／ IQ <b>${iqN}</b><br>
-    マクロ後の残り: 耐久 <b>${Math.max(1,d)}</b> ／ CP <b>${(cpMax-cp).toLocaleString()}</b>（手動予算${reserve}確保）
-    ／ ヴェネ残${vene}T ／ マニピュ残${manip}T<br>
-    <span style="color:var(--sub)">※通常状態前提の控えめ見積り。実際は状態ボーナスで上振れする。工数はここから先を手動で仕上げる（完成事故防止のため絶対にマクロで満タンにしない設計）</span>
-  </div>`;
-  chunks.forEach((c, idx)=>{
-    const isLast = idx === chunks.length - 1;
-    c.push(isLast ? `/e マクロ終了、リカバリー入力へ！ <se.14>` : `/e マクロ${idx+1}おわり <se.1>`);
-    html += `<div style="margin-top:10px;"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-      <b style="font-size:0.8rem;">マクロ${idx+1}（${c.length}行）</b>
-      <button onclick="copyMacroText(this)" style="border:1px solid var(--accent); background:var(--panel2); color:var(--accent); border-radius:8px; padding:4px 14px; font-size:0.75rem;">コピー</button></div>
-      <textarea readonly rows="${c.length+1}" style="width:100%; background:#0d0f14; border:1px solid var(--line); border-radius:8px; color:var(--text); font-size:0.72rem; line-height:1.55; padding:8px; font-family:Consolas,monospace; resize:none;">${c.join("\n")}</textarea></div>`;
-  });
-  html += `<button onclick="applyMacroPlan()" style="width:100%; margin-top:12px; padding:12px 0; border:1px solid var(--accent2); border-radius:10px; background:var(--accent2); color:#08131a; font-weight:700; font-size:0.9rem;">この見込みをリカバリー入力へ転記（実機の値に直して同期）</button>`;
-  document.getElementById("macroOut").innerHTML = html;
-}
-function copyMacroText(btn){
-  const ta = btn.parentElement.nextElementSibling || btn.closest("div").parentElement.querySelector("textarea");
-  const text = ta ? ta.value : "";
-  navigator.clipboard.writeText(text).then(()=>{ btn.textContent="コピーした！"; setTimeout(()=>btn.textContent="コピー",1500); });
-}
-function applyMacroPlan(){
-  if(!lastMacroPlan) return;
-  setMode(true);              // 実機モードへ
-  showPage("sim");
-  toggleRecovery();           // パネルを開いて現在値をプリセット
-  const P = lastMacroPlan;
-  document.getElementById("rec-prog").value = P.progress;
-  document.getElementById("rec-qual").value = P.quality;
-  document.getElementById("rec-dur").value = P.dur;
-  document.getElementById("rec-cp").value = P.cp;
-  document.getElementById("rec-iq").value = P.iq;
-  document.getElementById("rec-step").value = P.step;
-  document.getElementById("rec-ven").value = P.vene;
-  document.getElementById("rec-manip").value = P.manip;
-  document.getElementById("rec-innov").value = 0;
-  document.getElementById("rec-gs").value = 0;
-  document.getElementById("rec-mume").value = 0;
-}
+/* 前半マクロビルダーはv6.5で撤去（運用が全手打ちに完全移行したため。復元はgit履歴のv6.4以前から） */
 
 /* 起動 */
 readSettings();
