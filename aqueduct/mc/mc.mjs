@@ -39,6 +39,7 @@ function parseArgs(argv) {
     else if (a === "--w") { const [k, v] = argv[++i].split("="); (o.w ??= {})[k] = parseFloat(v); } // 評価関数の重み上書き（繰り返し可）
     else if (a === "--simparity") o.simparity = parseInt(argv[++i], 10); // simApply vs doAction 差分テスト（Nプレイアウト）
     else if (a === "--jobs") o.jobs = parseInt(argv[++i], 10); // 並列ワーカー数（1=シリアル。既定=論理コア-2）
+    else if (a === "--ban") (o.ban ??= []).push(argv[++i]); // 指定アクションを使用禁止にしてA/B（繰り返し可）
     else throw new Error("unknown arg: " + a);
   }
   if (!["core", "safe", "search"].includes(o.brain)) throw new Error("--brain must be core|safe|search");
@@ -257,11 +258,12 @@ function traceObj(r) {
 const PROGRESS_EVERY = 20; // ワーカー→親への進捗通知粒度 (run数)
 
 function workerMain() {
-  const { tasks, seedBase, brain, depth, w, beam } = workerData;
+  const { tasks, seedBase, brain, depth, w, beam, ban } = workerData;
   const eng = loadEngine();
   if (depth !== null) eng.searchDepth = depth;
   if (w) eng.searchW = w;
   if (beam) eng.searchBeam = beam;
+  if (ban) for (const id of ban) { if (!eng.A[id]) throw new Error("--ban unknown action: " + id); eng.A[id].neverUsable = true; }
   const results = [];
   const traces = {};
   let sinceNotify = 0;
@@ -309,7 +311,7 @@ function runAllParallel(opt) {
     };
     for (let j = 0; j < jobs; j++) {
       const wk = new Worker(__file, {
-        workerData: { tasks: workerTasks[j], seedBase: opt.seed, brain: opt.brain, depth: opt.depth, w: opt.w, beam: opt.beam },
+        workerData: { tasks: workerTasks[j], seedBase: opt.seed, brain: opt.brain, depth: opt.depth, w: opt.w, beam: opt.beam, ban: opt.ban ?? null },
       });
       workers.push(wk);
       wk.on("message", (msg) => {
