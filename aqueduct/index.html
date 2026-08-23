@@ -115,7 +115,7 @@
 </head>
 <body>
 <header>
-  <h1>ルインド・アクアダクト中間素材 製作支援・進化版 <span id="app-ver" style="font-size:0.78em; font-weight:700; color:var(--accent); border:1px solid var(--accent); border-radius:8px; padding:1px 9px; vertical-align:middle; white-space:nowrap;">v6.3</span></h1>
+  <h1>ルインド・アクアダクト中間素材 製作支援・進化版 <span id="app-ver" style="font-size:0.78em; font-weight:700; color:var(--accent); border:1px solid var(--accent); border-radius:8px; padding:1px 9px; vertical-align:middle; white-space:nowrap;">v6.4</span></h1>
   <!-- ※ app-ver はパッチのたびに手で上げる（コミットとセットで）。リロードでこの数字が変われば更新が来た合図 -->
   <div class="sub">部材/金属材/錬金樹脂 共通レシピ(rlvl776) 工数11250 / 品質31520 / 耐久60 ｜ 完成ライン品質31500 ｜ 前半マクロ＋後半手打ちのハイブリッド運用対応</div>
   <div class="tabs">
@@ -540,13 +540,15 @@ function qualGain(a, effOverride){
   if(st.buffs.innovation>0) mult += 0.5;
   if(st.buffs.greatStrides>0) mult += 1.0;
   let cond = st.condition==="good" ? 1.75 : 1; // コスモツール(スターズ)効果: 高品質時1.75倍
-  return Math.floor(Math.floor(baseQual()*iqMult + EPS) * eff * cond * mult + EPS);
+  // 実機はIQ倍率適用後に切り捨てず最後まで端数を保持する（2026-08-23実戦ログで確定:
+  // IQ2集中加工1096=348*1.2*1.5*1.75、IQ6下地加工1113=348*1.6*2。旧実装の内側floorは1〜2過小）
+  return Math.floor(baseQual()*iqMult * eff * cond * mult + EPS);
 }
 function byregotEstimate(condMult){
   // 見込み表示用: 現在のIQ・バフ込み。condMult=1.75で高品質時の値
   let eff = (100+20*st.iq)/100;
   let mult = 1 + (st.buffs.innovation>0?0.5:0) + (st.buffs.greatStrides>0?1.0:0);
-  return Math.floor(Math.floor(baseQual()*(1+0.1*st.iq)+EPS) * eff * (condMult||1) * mult + EPS);
+  return Math.floor(baseQual()*(1+0.1*st.iq) * eff * (condMult||1) * mult + EPS);
 }
 function byregotNow(){ return qualGain(A.byregot); } // 今この瞬間に撃った場合の正確な値（状態込み）
 
