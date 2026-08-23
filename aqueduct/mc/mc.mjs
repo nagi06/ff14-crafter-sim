@@ -40,6 +40,7 @@ function parseArgs(argv) {
     else if (a === "--simparity") o.simparity = parseInt(argv[++i], 10); // simApply vs doAction 差分テスト（Nプレイアウト）
     else if (a === "--jobs") o.jobs = parseInt(argv[++i], 10); // 並列ワーカー数（1=シリアル。既定=論理コア-2）
     else if (a === "--ban") (o.ban ??= []).push(argv[++i]); // 指定アクションを使用禁止にしてA/B（繰り返し可）
+    else if (a === "--gate") { const [id, conds] = argv[++i].split(":"); (o.gate ??= []).push({ id, conds: conds.split(",") }); } // 例: --gate rapidSynth:centered,sturdy,robust,malleable = その状態のときだけ使用可
     else throw new Error("unknown arg: " + a);
   }
   if (!["core", "safe", "search"].includes(o.brain)) throw new Error("--brain must be core|safe|search");
@@ -258,12 +259,19 @@ function traceObj(r) {
 const PROGRESS_EVERY = 20; // ワーカー→親への進捗通知粒度 (run数)
 
 function workerMain() {
-  const { tasks, seedBase, brain, depth, w, beam, ban } = workerData;
+  const { tasks, seedBase, brain, depth, w, beam, ban, gate } = workerData;
   const eng = loadEngine();
   if (depth !== null) eng.searchDepth = depth;
   if (w) eng.searchW = w;
   if (beam) eng.searchBeam = beam;
   if (ban) for (const id of ban) { if (!eng.A[id]) throw new Error("--ban unknown action: " + id); eng.A[id].neverUsable = true; }
+  // 状態ゲート: 指定状態のときだけ使用可（canUse/simCandidatesはneverUsableを毎回読むため、
+  // getterにするとUI実行・探索シミュ両方の「現在の状態」で判定される）
+  if (gate) for (const g of gate) {
+    if (!eng.A[g.id]) throw new Error("--gate unknown action: " + g.id);
+    const allowed = new Set(g.conds);
+    Object.defineProperty(eng.A[g.id], "neverUsable", { configurable: true, get() { return !allowed.has(eng.st.condition); } });
+  }
   const results = [];
   const traces = {};
   let sinceNotify = 0;
@@ -311,7 +319,7 @@ function runAllParallel(opt) {
     };
     for (let j = 0; j < jobs; j++) {
       const wk = new Worker(__file, {
-        workerData: { tasks: workerTasks[j], seedBase: opt.seed, brain: opt.brain, depth: opt.depth, w: opt.w, beam: opt.beam, ban: opt.ban ?? null },
+        workerData: { tasks: workerTasks[j], seedBase: opt.seed, brain: opt.brain, depth: opt.depth, w: opt.w, beam: opt.beam, ban: opt.ban ?? null, gate: opt.gate ?? null },
       });
       workers.push(wk);
       wk.on("message", (msg) => {
