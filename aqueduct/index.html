@@ -293,7 +293,7 @@
   <ul class="note">
     <li>レシピ: rlvl776 / 除数180・180 / 補正100%（XIVAPI実データ。効率はLv100通常レシピと同じ）</li>
     <li>デフォルトは<b>コスモツール最終（スターズ: 作業+1842/加工+976/CP+8）＋防具新式</b>想定: 作業精度5779 → 100%効率あたり進捗323、加工精度5502 → 品質340、CP657（設定タブで変更可、食事薬のCPも反映）</li>
-    <li>コスモツールの特殊効果<b>「高品質」時の品質上昇量1.75倍</b>（通常道具は1.5倍）を品質計算・おすすめ・勝算判定に反映済み。新式装備で挑む場合は<a href="../shinshiki/">新式版</a>を使うこと</li>
+    <li>コスモツールの特殊効果<b>「高品質」時の品質上昇量1.75倍</b>（通常道具は1.5倍）を品質計算・おすすめ・勝算判定に反映済み。新式装備（通常道具・1.5倍）で挑む場合は qualGain の 1.75 を 1.5 に変えて使うこと（新式版ページは撤去済み）</li>
     <li>出る状態は【通常・高品質・高進捗・高能率・頑丈・頑強・安定・長持続】の8種のみ。<b>最高品質・不調・良兆候は高難度レシピでは出ない</b>（検証者のリストと仕様解説で確認済み）。頑強（耐久半減＋次ターン必ず頑丈）は実プレイで確認済み</li>
     <li>状態変化の出現率は<b>実機ミラー実測ベース</b>（2026-08-18・部材48T/44サンプル: 頑丈17% / 頑強10% / 高品質10% / 高進捗9% / 高能率14% / 安定10% / 長持続9% / 通常21%、頑強の翌ターンは必ず頑丈）。<b>頑丈系がターンの4割前後</b>、高品質は旧推定の半分。サンプルが増えたら CONDITIONS の数値を更新して精度を上げる</li>
     <li>「おすすめ」はv6で<b>先読み期待値探索</b>になった（設定タブ「おすすめの思考」で深さ変更可）。数手先を成功確率と次ターンの状態出現率で期待値展開し、ゴール逆算の評価で最大値の手を出す。機械自動プレイの勝率はv5系ヒューリスティック6.2%→v6探索で深さ3手9.5%・4手23.5%・5手30%（既定）・6手37%（MC測定2026-08-18）。それでも<b>判断の目安</b>であることは変わらない——状態の引きに合わせた人間の判断で上積みするのが本番</li>
@@ -419,7 +419,7 @@ const ACTIONS = [
   {id:"mastersMend", name:"マスターズメンド", type:"other", cp:88, dur:0, group:"misc", note:"耐久+30"},
   {id:"immaculateMend", name:"ﾊﾟｰﾌｪｸﾄﾒﾝﾄﾞ", type:"other", cp:112, dur:0, group:"misc", note:"耐久全回復"},
   {id:"trainedPerfection", name:"匠の絶技", type:"other", cp:0, dur:0, group:"misc",
-   oncePerCraft:"tp", noStepBuff:true, note:"次の技の耐久消費0(1回)"},
+   oncePerCraft:"tp", note:"次の技の耐久消費0(1回)"},
   {id:"tricks", name:"秘訣", type:"other", cp:0, dur:0, group:"misc", goodOnly:true, note:"CP+20"},
   {id:"carefulObservation", name:"設計変更", type:"other", cp:0, dur:0, group:"misc",
    limited:"co", limit:3, noStep:true, note:"状態を引き直す(3回)"},
@@ -987,7 +987,7 @@ function recommendCore(){
   // CP終端の手仕舞い: ビエルゴを撃たずにCPが尽きるのが最悪
   if(st.iq>=6 && st.cp < 70 && st.durability>10 && st.cp>=cpCost(A.byregot)){
     if(!st.qiUsed && st.buffs.innovation<=0) return r("quickInnovation","CP残がビエルゴ1回分。クイックイノベーション(0CP)を乗せてから撃つ");
-    // 素で届かないが高品質(1.5倍)なら届く → 残CPの許す限り祈る
+    // 素で届かないが高品質(1.75倍)なら届く → 残CPの許す限り祈る
     if(remQ > byregotNow() && remQ <= Math.floor(byregotEstimate()*1.75)){
       if(cond==="normal" && st.coLeft>0) return r("carefulObservation","素のビエルゴでは届かない。設計変更で高品質を釣って1.75倍ビエルゴ");
       if(st.cp >= cpCost(A.observe)+24) return r("observe","素のビエルゴでは届かない。経過観察で流して高品質ビエルゴを祈る（残CP分だけ粘れる）");
@@ -1128,7 +1128,7 @@ function assess(){
   const finesseN = Math.max(0, Math.floor(cp/36.5));
   q += finesseN * Math.floor(Math.floor(bq*2+EPS)*1.5+EPS);
   q += Math.floor(Math.floor(bq*2+EPS)*3*2.5+EPS); // GS+イノベのビエルゴ
-  // 上振れ期待: 高品質(集中加工/1.5倍ビエルゴ)
+  // 上振れ期待: 高品質(集中加工/1.75倍ビエルゴ)
   const turns = nProg + need + finesseN + 3;
   const upside = q + Math.round(turns*0.08*1950); // 高品質(v5.5再校正で自然出現8%)による集中加工/1.75倍ビエルゴの上積み期待
 
@@ -1343,6 +1343,9 @@ function searchStep(s, depth){
   const isRoot = depth>=SEARCH_DEPTH;
   // ルート直後の1遷移だけ本物のチャンスノード: 次ターンの状態変化8種を確率加重で展開する。
   // これで「経過観察/設計変更で高品質を釣る」「高能率待ち」に正の期待値がつく（それより深い未来は通常扱い）
+  // 注意（2026-09-05棄却実験）: 通常状態でターン非消費技（QI・一心・最終確認）を撃った子も8状態展開される。
+  // 厳密には状態が変わらないので誤りだが、「ターンが進んだ手と設計変更だけ展開」に直すと5手勝率33.6%→27.4%に悪化
+  // （温存重み rHS/rQI がこの癖込みで校正されており、直すと一心・QIを抱え込む）。直すなら rHS/rQI の再校正とセットで
   const childValue = (ns, d)=>{
     if(isRoot && !ns.finished && !ns.failed && ns.condition==="normal"){
       let ev = 0;
@@ -1638,7 +1641,9 @@ st = newState();
 try{
   const saved = JSON.parse(localStorage.getItem("aqueduct-autosave") || "null");
   if(saved && saved.st && !saved.st.finished && (saved.st.step > 1 || saved.st.history.length > 0)){
-    st = saved.st;
+    // 旧バージョンの保存に無いフィールド（buffs.expedience 等）は初期値で補完する
+    const base = newState();
+    st = Object.assign(base, saved.st, { buffs: Object.assign(base.buffs, saved.st.buffs||{}) });
     if(saved.followMode) setMode(true);
   }
 }catch(e){}
